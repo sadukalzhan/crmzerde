@@ -1,0 +1,39 @@
+# Render Blueprint — деплой в один клик через «New + → Blueprint».
+# Один web-сервис (Express отдаёт собранный фронтенд) + бесплатный PostgreSQL.
+# Docs: https://render.com/docs/blueprint-spec
+
+databases:
+  - name: zerde-crm-db
+    plan: free
+    databaseName: crm
+    user: crm
+    region: frankfurt
+
+services:
+  - type: web
+    name: zerde-keramika-crm
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: bash render-build.sh
+    startCommand: node server/dist/index.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Чтобы npm установил devDependencies (typescript, prisma, vite) на этапе сборки
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
+      - key: DATABASE_PROVIDER
+        value: postgresql
+      - key: DATABASE_URL
+        fromDatabase:
+          name: zerde-crm-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true # Render сгенерирует надёжный секрет
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: STORAGE_DRIVER
+        value: local # ⚠️ free-план: файлы эфемерны; для постоянства добавьте Disk или S3

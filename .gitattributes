@@ -1,0 +1,3 @@
+# Скрипты сборки должны иметь LF-окончания (выполняются на Linux в Render)
+*.sh text eol=lf
+* text=auto

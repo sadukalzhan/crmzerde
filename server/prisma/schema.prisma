@@ -1,0 +1,355 @@
+// Зерде Керамика Актобе — CRM — модель данных.
+//
+// Схема написана переносимо между SQLite (dev) и PostgreSQL (prod):
+//  - НЕ используются native enum и scalar-массивы (их нет в SQLite);
+//    перечисления хранятся строками и валидируются в приложении (см. src/domain).
+//  - Для PostgreSQL: смените provider на "postgresql" и DATABASE_URL в .env.
+//
+// Денежные поля — Float (демо-упрощение). Для production используйте Decimal/numeric.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // dev. Для production: "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Пользователи и доступ
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  fullName     String
+  email        String   @unique
+  passwordHash String
+  role         String // ADMIN | MANAGER | FACTORY | WAREHOUSE | LOGIST | ACCOUNTANT | CLIENT
+  phone        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Связи
+  clientProfile     Client?              @relation("ClientUser")
+  managedClients    Client[]             @relation("ClientManager")
+  ordersManaged     Order[]              @relation("OrderManager")
+  ordersClosed      Order[]              @relation("OrderCloser")
+  historyEntries    OrderHistory[]       @relation("HistoryActor")
+  documentsUploaded Document[]           @relation("DocUploader")
+  claimsCreated     Claim[]              @relation("ClaimCreator")
+  notifications     Notification[]
+  resetTokens       PasswordResetToken[]
+
+  @@index([role])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Клиенты
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Client {
+  id           String   @id @default(cuid())
+  companyName  String
+  contactName  String?
+  email        String?
+  phone        String?
+  bin          String? // БИН/ИНН — реквизиты
+  address      String?
+  debt         Float    @default(0) // текущая дебиторка (долг)
+  creditBlocked Boolean @default(false) // заблокирован по долгу
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Аккаунт-логин клиента (роль CLIENT), один-к-одному
+  userId String? @unique
+  user   User?   @relation("ClientUser", fields: [userId], references: [id])
+
+  // Ответственный менеджер
+  managerId String?
+  manager   User?   @relation("ClientManager", fields: [managerId], references: [id])
+
+  orders Order[]
+  claims Claim[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Справочники: номенклатура, заводы, перевозчики
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Product {
+  id           String   @id @default(cuid())
+  name         String // «Cemento Ivory Carving 60×60»
+  size         String? // «60×60»
+  collection   String? // «Cemento»
+  unit         String   @default("PALLET") // PALLET | M2
+  pricePerUnit Float    @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  inventory          Inventory?
+  orderItems         OrderItem[]
+  specificationItems SpecificationItem[]
+  reservations       Reservation[]
+}
+
+model Factory {
+  id       String  @id @default(cuid())
+  name     String
+  city     String
+  isActive Boolean @default(true)
+
+  orders Order[]
+}
+
+model Carrier {
+  id       String  @id @default(cuid())
+  name     String
+  phone    String?
+  isActive Boolean @default(true)
+
+  orders Order[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Заявка / Сделка
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Order {
+  id     String @id @default(cuid())
+  number Int    @unique // отображается как #233
+
+  status   String  @default("NEW") // см. src/domain/orderStatus.ts
+  priority String  @default("MEDIUM") // HIGH | MEDIUM | LOW
+
+  // Производственный приоритет: 1 (аванс) выше 2 (постоплата)
+  productionPriority Int?
+
+  paymentTerm   String @default("PREPAYMENT") // PREPAYMENT | POSTPAYMENT
+  paymentStatus String @default("UNPAID") // UNPAID | PARTIAL | PAID | POSTPAY_APPROVED
+
+  // Объём заявки (агрегированно для карточки), детально — в items
+  quantity Float  @default(0)
+  unit     String @default("PALLET") // PALLET | M2
+
+  shipFrom String? // завод-отгрузка, «Актобе»
+  shipTo   String? // «Москва-Бронницы»
+  route    String? // «Актобе → Москва-Бронницы»
+
+  desiredDate         DateTime? // желаемая дата клиента
+  productionStartDate DateTime? // дата запуска (правило 15-го числа)
+  rejectionReason     String?
+  closedAt            DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Связи
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+
+  managerId String?
+  manager   User?   @relation("OrderManager", fields: [managerId], references: [id])
+
+  closedById String?
+  closedBy   User?   @relation("OrderCloser", fields: [closedById], references: [id])
+
+  factoryId String?
+  factory   Factory? @relation(fields: [factoryId], references: [id])
+
+  carrierId String?
+  carrier   Carrier? @relation(fields: [carrierId], references: [id])
+
+  items               OrderItem[]
+  specifications      Specification[]
+  contracts           Contract[]
+  documents           Document[]
+  history             OrderHistory[]
+  claims              Claim[]
+  productionPlanItems ProductionPlanItem[]
+  reservations        Reservation[]
+  notifications       Notification[]
+
+  @@index([status])
+  @@index([clientId])
+  @@index([managerId])
+}
+
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  quantity     Float
+  unit         String  @default("PALLET")
+  pricePerUnit Float   @default(0)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Документы сделки
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Specification {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  number         String
+  fileUrl        String?
+  total          Float    @default(0)
+  managerSigned  Boolean  @default(false)
+  managerSignedAt DateTime?
+  clientSigned   Boolean  @default(false)
+  clientSignedAt DateTime?
+  createdAt      DateTime @default(now())
+
+  items SpecificationItem[]
+}
+
+model SpecificationItem {
+  id              String        @id @default(cuid())
+  specificationId String
+  specification   Specification @relation(fields: [specificationId], references: [id], onDelete: Cascade)
+  productId       String?
+  product         Product?      @relation(fields: [productId], references: [id])
+  name            String
+  quantity        Float
+  unit            String        @default("PALLET")
+  price           Float         @default(0)
+  sum             Float         @default(0)
+}
+
+model Contract {
+  id            String    @id @default(cuid())
+  orderId       String
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  number        String
+  fileUrl       String?
+  managerSigned Boolean   @default(false)
+  clientSigned  Boolean   @default(false)
+  signedAt      DateTime?
+  createdAt     DateTime  @default(now())
+}
+
+model Document {
+  id           String   @id @default(cuid())
+  orderId      String
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type         String // TTN | UPD | ACT | INVOICE | OTHER
+  name         String
+  fileUrl      String
+  uploadedById String?
+  uploadedBy   User?    @relation("DocUploader", fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Производство и склад
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ProductionPlan {
+  id        String   @id @default(cuid())
+  year      Int
+  month     Int // 1..12
+  createdAt DateTime @default(now())
+
+  items ProductionPlanItem[]
+
+  @@unique([year, month])
+}
+
+model ProductionPlanItem {
+  id        String   @id @default(cuid())
+  planId    String
+  plan      ProductionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  priority  Int      @default(2) // 1 = аванс (первая очередь), 2 = постоплата
+  status    String   @default("PLANNED") // PLANNED | IN_PRODUCTION | PRODUCED | TRANSFERRED
+  startDate DateTime?
+  createdAt DateTime @default(now())
+}
+
+model Inventory {
+  id        String   @id @default(cuid())
+  productId String   @unique
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Float    @default(0)
+  reserved  Float    @default(0)
+  unit      String   @default("PALLET")
+  updatedAt DateTime @updatedAt
+}
+
+model Reservation {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Float
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Рекламации, история, уведомления, настройки
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Claim {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  clientId    String?
+  client      Client?  @relation(fields: [clientId], references: [id])
+  description String
+  status      String   @default("OPEN") // OPEN | IN_REVIEW | RESOLVED | REJECTED
+  resolution  String?
+  createdById String?
+  createdBy   User?    @relation("ClaimCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model OrderHistory {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus String?
+  toStatus   String
+  note       String?
+  actorId    String?
+  actor      User?    @relation("HistoryActor", fields: [actorId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // STATUS_CHANGE | NEW_ORDER | SIGNATURE | DOC_OVERDUE | PLAN_ADDED | CLAIM | GENERIC
+  title     String
+  body      String?
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+}
+
+model Setting {
+  key   String @id
+  value String
+}

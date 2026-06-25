@@ -88,6 +88,31 @@ npm run dev
 
 ---
 
+## Деплой на Render (бесплатно)
+
+Проект настроен как **один web-сервис** (Express отдаёт собранный фронтенд) + бесплатный
+PostgreSQL. Конфигурация — в [`render.yaml`](render.yaml) (Blueprint), сборка — в
+[`render-build.sh`](render-build.sh).
+
+1. Запушьте репозиторий на **GitHub** (или GitLab):
+   ```bash
+   git remote add origin https://github.com/<вы>/zerde-crm.git
+   git push -u origin main
+   ```
+2. На [render.com](https://render.com) → **New + → Blueprint** → подключите этот репозиторий.
+   Render прочитает `render.yaml` и создаст web-сервис + базу PostgreSQL.
+3. Нажмите **Apply** — пойдёт сборка (`render-build.sh`): установка зависимостей, сборка фронта/бэка,
+   `prisma db push`, авто-сид демо-данными (только если БД пустая).
+4. Откройте выданный адрес `https://<имя>.onrender.com` — войдите под тестовой учёткой.
+
+Переменные (`DATABASE_URL`, `JWT_SECRET` и т.д.) Render проставит сам из `render.yaml`.
+
+> **Нюансы free-плана:** сервис «засыпает» после 15 мин простоя (первый запрос будит ~30–60 с);
+> бесплатный Postgres живёт ~30 дней; загруженные файлы эфемерны (для постоянства — Render Disk
+> или S3). Для боевого использования — платный инстанс/диск.
+
+---
+
 ## Переменные окружения
 
 `server/.env` (см. `server/.env.example`):

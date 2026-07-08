@@ -247,3 +247,5 @@ PostgreSQL. Конфигурация — в [`render.yaml`](render.yaml) (Bluepr
 
 > **Демо-упрощения:** денежные поля — `Float` (для production → `numeric`); файловое
 > хранилище по умолчанию локальное (`STORAGE_DRIVER=local`), для production — S3 (MinIO в docker-compose).
+#   c r m z e r d e  
+ 

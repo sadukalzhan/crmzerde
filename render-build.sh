@@ -12,12 +12,13 @@ node server/scripts/set-db-provider.js postgresql
 echo "==> Сборка фронтенда"
 npm run build --prefix client
 
-echo "==> Сборка бэкенда"
+# Сборка бэкенда: build-скрипт сам делает `prisma generate` перед `tsc`,
+# поэтому типы Prisma.* доступны на этапе компиляции.
+echo "==> Сборка бэкенда (prisma generate + tsc)"
 npm run build --prefix server
 
-echo "==> Применение схемы к БД + генерация клиента Prisma"
+echo "==> Применение схемы к БД"
 cd server
-npx prisma generate
 npx prisma db push --skip-generate --accept-data-loss
 
 echo "==> Сид демо-данными (только если БД пустая)"

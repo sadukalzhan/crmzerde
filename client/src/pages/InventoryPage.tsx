@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Boxes, Plus, Minus, FileSpreadsheet } from 'lucide-react';
+import { Boxes, Plus, Minus, FileSpreadsheet, Upload } from 'lucide-react';
 import { Page, PageHeader } from '../components/PageHeader';
 import { PageLoader, EmptyState, Modal, Field } from '../components/ui';
 import { useInventory } from '../lib/queries';
@@ -23,9 +23,27 @@ export default function InventoryPage() {
   const user = useAuth((s) => s.user)!;
   const canEdit = user.role === 'WAREHOUSE' || user.role === 'ADMIN' || user.role === 'FACTORY';
   const qc = useQueryClient();
+  const canImport = user.role === 'WAREHOUSE' || user.role === 'ADMIN';
   const { data: inventory = [], isLoading } = useInventory();
   const [adjust, setAdjust] = useState<Inventory | null>(null);
   const [delta, setDelta] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const onImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await api.post('/inventory/import', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      toast.success(`Импорт: обновлено ${data.updated}${data.skipped ? `, пропущено ${data.skipped}` : ''}`);
+      if (data.errors?.length) toast.info(data.errors[0]);
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+    } catch (err) {
+      toast.error(apiError(err));
+    }
+    if (fileRef.current) fileRef.current.value = '';
+  };
 
   if (isLoading) return <PageLoader />;
 
@@ -63,9 +81,19 @@ export default function InventoryPage() {
         title="Остатки на складе"
         subtitle="Запасы и резервы по товарам и сортам (м² · коробки · поддоны)"
         actions={
-          <button onClick={exportExcel} className="btn-soft">
-            <FileSpreadsheet size={16} /> Выгрузить в Excel
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {canImport && (
+              <>
+                <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={onImport} />
+                <button onClick={() => fileRef.current?.click()} className="btn-soft">
+                  <Upload size={16} /> Импорт из Excel
+                </button>
+              </>
+            )}
+            <button onClick={exportExcel} className="btn-soft">
+              <FileSpreadsheet size={16} /> Выгрузить в Excel
+            </button>
+          </div>
         }
       />
 

@@ -13,6 +13,7 @@ import type {
   Notification,
   Order,
   Product,
+  Reservation,
   Specification,
   User,
 } from './types';
@@ -157,6 +158,38 @@ export const useCarriers = () =>
 
 export const useInventory = () =>
   useQuery({ queryKey: ['inventory'], queryFn: async () => (await api.get<Inventory[]>('/inventory')).data });
+
+export const useReservations = () =>
+  useQuery({ queryKey: ['reservations'], queryFn: async () => (await api.get<Reservation[]>('/reservations')).data });
+
+export const useDeleteOrder = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/orders/${id}`)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      qc.invalidateQueries({ queryKey: ['reservations'] });
+    },
+  });
+};
+
+export const useDeleteClient = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/clients/${id}`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['clients'] }),
+  });
+};
+
+export const useUpdateClient = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { id: string; data: Record<string, unknown> }) =>
+      (await api.patch(`/clients/${vars.id}`, vars.data)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['clients'] }),
+  });
+};
 
 // ── Производство ──
 export const useProductionPlan = (year: number, month: number) =>

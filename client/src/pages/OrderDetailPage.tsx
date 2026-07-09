@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ShieldCheck, Upload, Download, PenLine, Plus, Trash2, Wallet,
-  History as HistoryIcon, Building2, AlertTriangle, CheckCircle2, X,
+  History as HistoryIcon, Building2, AlertTriangle, CheckCircle2, X, Pencil,
 } from 'lucide-react';
 import { Page } from '../components/PageHeader';
 import { PageLoader, EmptyState, Modal, Field } from '../components/ui';
@@ -11,7 +11,7 @@ import { StatusTracker } from '../components/StatusTracker';
 import {
   useOrder, useMeta, useProducts, useTransition, useCreditCheck, useUpdatePayment,
   useUploadDocument, useSignSpec, useCreateSpec, useCreateContract, useSignContract, useUpdateClaim,
-  useCreateClaim,
+  useCreateClaim, useUpdateOrder, useDeleteOrder, useUsers, useFactories, useCarriers,
 } from '../lib/queries';
 import { api, apiError, fileHref } from '../lib/api';
 import { toast } from '../components/toast';
@@ -19,7 +19,7 @@ import { fmtDate, fmtDateTime, fmtMoney, fmtM2 } from '../lib/format';
 import { boxes, pallets, GRADE_LABELS } from '../lib/packaging';
 import { useAuth } from '../lib/store';
 import { useQueryClient } from '@tanstack/react-query';
-import type { OrderStatus } from '../lib/types';
+import type { Order, OrderStatus } from '../lib/types';
 
 const DOC_TYPE_OPTIONS = ['TTN', 'UPD', 'ACT', 'INVOICE', 'OTHER'];
 
@@ -44,6 +44,9 @@ export default function OrderDetailPage() {
   const signContract = useSignContract();
   const updateClaim = useUpdateClaim();
   const createClaim = useCreateClaim();
+  const updateOrder = useUpdateOrder();
+  const deleteOrder = useDeleteOrder();
+  const isAdmin = user.role === 'ADMIN';
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [docType, setDocType] = useState('TTN');
@@ -52,6 +55,8 @@ export default function OrderDetailPage() {
   const [specOpen, setSpecOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const [claimText, setClaimText] = useState('');
+  const [adminEdit, setAdminEdit] = useState(false);
+  const [delOpen, setDelOpen] = useState(false);
 
   if (isLoading || !meta) return <PageLoader />;
   if (isError || !order)
@@ -378,6 +383,13 @@ export default function OrderDetailPage() {
                   <AlertTriangle size={16} /> Подать рекламацию
                 </button>
               )}
+              {isAdmin && (
+                <>
+                  <div className="my-1 border-t border-border" />
+                  <button onClick={() => setAdminEdit(true)} className="btn-soft w-full"><Pencil size={15} /> Редактировать (админ)</button>
+                  <button onClick={() => setDelOpen(true)} className="btn-ghost w-full !text-rose-300 hover:!bg-rose-500/10"><Trash2 size={15} /> Удалить заявку</button>
+                </>
+              )}
             </div>
           </Section>
 
@@ -505,7 +517,116 @@ export default function OrderDetailPage() {
           />
         </Field>
       </Modal>
+
+      {/* Админ: удаление */}
+      <Modal
+        open={delOpen}
+        onClose={() => setDelOpen(false)}
+        title={`Удалить заявку #${order.number}?`}
+        footer={
+          <>
+            <button className="btn-ghost" onClick={() => setDelOpen(false)}>Отмена</button>
+            <button
+              className="btn-primary !bg-rose-500 hover:!bg-rose-600"
+              onClick={() =>
+                deleteOrder.mutate(order.id, {
+                  onSuccess: () => { toast.success('Заявка удалена'); navigate('/orders'); },
+                  onError: (e) => toast.error(apiError(e)),
+                })
+              }
+            >
+              Удалить
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted">
+          Заявка и связанные данные (позиции, история, документы, план производства) будут удалены безвозвратно.
+          Резервы по заявке вернутся в остаток.
+        </p>
+      </Modal>
+
+      {/* Админ: редактирование */}
+      {isAdmin && adminEdit && <AdminEditModal order={order} onClose={() => setAdminEdit(false)} />}
     </Page>
+  );
+}
+
+function AdminEditModal({ order, onClose }: { order: Order; onClose: () => void }) {
+  const update = useUpdateOrder();
+  const { data: users = [] } = useUsers();
+  const { data: factories = [] } = useFactories();
+  const { data: carriers = [] } = useCarriers();
+  const managers = users.filter((u) => u.role === 'MANAGER');
+  const [form, setForm] = useState({
+    priority: order.priority,
+    managerId: order.manager?.id ?? '',
+    factoryId: order.factory?.id ?? '',
+    carrierId: order.carrier?.id ?? '',
+    selfPickup: order.selfPickup,
+    shipTo: order.shipTo ?? '',
+    desiredDate: order.desiredDate ? order.desiredDate.slice(0, 10) : '',
+  });
+
+  const save = () =>
+    update.mutate(
+      {
+        id: order.id,
+        data: {
+          priority: form.priority,
+          managerId: form.managerId || null,
+          factoryId: form.factoryId || null,
+          carrierId: form.selfPickup ? null : form.carrierId || null,
+          selfPickup: form.selfPickup,
+          shipTo: form.shipTo || undefined,
+          desiredDate: form.desiredDate || null,
+        },
+      },
+      { onSuccess: () => { toast.success('Заявка обновлена'); onClose(); }, onError: (e) => toast.error(apiError(e)) },
+    );
+
+  return (
+    <Modal
+      open
+      wide
+      onClose={onClose}
+      title={`Редактирование заявки #${order.number}`}
+      footer={<><button className="btn-ghost" onClick={onClose}>Отмена</button><button className="btn-primary" onClick={save}>Сохранить</button></>}
+    >
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="Приоритет">
+          <select className="input" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as Order['priority'] })}>
+            <option value="HIGH">Высокий</option>
+            <option value="MEDIUM">Средний</option>
+            <option value="LOW">Низкий</option>
+          </select>
+        </Field>
+        <Field label="Менеджер">
+          <select className="input" value={form.managerId} onChange={(e) => setForm({ ...form, managerId: e.target.value })}>
+            <option value="">Не назначен</option>
+            {managers.map((m) => <option key={m.id} value={m.id}>{m.fullName}</option>)}
+          </select>
+        </Field>
+        <Field label="Завод">
+          <select className="input" value={form.factoryId} onChange={(e) => setForm({ ...form, factoryId: e.target.value })}>
+            <option value="">Не выбран</option>
+            {factories.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Перевозчик">
+          <select className="input disabled:opacity-50" value={form.selfPickup ? '' : form.carrierId} disabled={form.selfPickup} onChange={(e) => setForm({ ...form, carrierId: e.target.value })}>
+            <option value="">{form.selfPickup ? 'Самовывоз' : 'Не выбран'}</option>
+            {!form.selfPickup && carriers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Адрес доставки"><input className="input" value={form.shipTo} onChange={(e) => setForm({ ...form, shipTo: e.target.value })} /></Field>
+        <Field label="Желаемая дата"><input className="input" type="date" value={form.desiredDate} onChange={(e) => setForm({ ...form, desiredDate: e.target.value })} /></Field>
+      </div>
+      <label className="mt-3 flex items-center gap-2 text-sm text-slate-200">
+        <input type="checkbox" checked={form.selfPickup} onChange={(e) => setForm({ ...form, selfPickup: e.target.checked })} className="h-4 w-4 accent-[#7C6CF6]" />
+        Самовывоз (без перевозчика)
+      </label>
+    </Modal>
   );
 }
 

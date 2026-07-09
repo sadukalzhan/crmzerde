@@ -5,7 +5,8 @@ import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validateBody } from '../../middleware/validate';
-import { asyncHandler } from '../../middleware/error';
+import { asyncHandler, badRequest } from '../../middleware/error';
+import { upload, deleteFile } from '../../lib/storage';
 import { boxes, pallets, FORMAT_LABELS, GRADE_LABELS } from '../../domain/packaging';
 
 const router = Router();
@@ -78,6 +79,76 @@ router.get(
     res.setHeader('Content-Disposition', 'attachment; filename="ostatki-sklada.xlsx"');
     await wb.xlsx.write(res);
     res.end();
+  }),
+);
+
+// Импорт остатков из Excel (данные из 1С). Столбцы: Номенклатура, Сорт, Остаток м².
+// Товар ищется по названию, сорт — по метке/ключу; количество устанавливается абсолютно.
+const GRADE_REV: Record<string, string> = {
+  'a сорт': 'A', 'b сорт': 'B', 'c сорт': 'C', брак: 'BRAK',
+  a: 'A', b: 'B', c: 'C', brak: 'BRAK',
+};
+
+router.post(
+  '/import',
+  requireRole('WAREHOUSE', 'ADMIN'),
+  upload.single('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw badRequest('Файл не передан');
+    try {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.readFile(req.file.path);
+      const ws = wb.worksheets[0];
+      if (!ws) throw badRequest('В файле нет листов');
+
+      // Индексируем колонки по заголовкам (порядок не важен).
+      const idx: Record<string, number> = {};
+      ws.getRow(1).eachCell((cell, col) => {
+        idx[String(cell.value ?? '').toLowerCase().trim()] = col;
+      });
+      const findCol = (...names: string[]) => {
+        for (const n of names) for (const k of Object.keys(idx)) if (k.includes(n)) return idx[k];
+        return null;
+      };
+      const nameCol = findCol('номенклатура', 'название', 'name', 'товар');
+      const gradeCol = findCol('сорт', 'grade');
+      const qtyCol = findCol('остаток', 'кол-во', 'quantity', 'м²', 'qty');
+      if (!nameCol || !qtyCol) throw badRequest('Не найдены колонки «Номенклатура» и «Остаток»');
+
+      const products = await prisma.product.findMany();
+      const byName = new Map(products.map((p) => [p.name.toLowerCase().trim(), p]));
+
+      let updated = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+      for (let r = 2; r <= ws.rowCount; r++) {
+        const row = ws.getRow(r);
+        const name = String(row.getCell(nameCol).value ?? '').trim();
+        if (!name) continue;
+        const product = byName.get(name.toLowerCase());
+        if (!product) {
+          skipped++;
+          errors.push(`Товар не найден: «${name}»`);
+          continue;
+        }
+        const gradeRaw = gradeCol ? String(row.getCell(gradeCol).value ?? 'A').toLowerCase().trim() : 'a';
+        const grade = GRADE_REV[gradeRaw] ?? (['A', 'B', 'C', 'BRAK'].includes(gradeRaw.toUpperCase()) ? gradeRaw.toUpperCase() : 'A');
+        const qty = Number(row.getCell(qtyCol).value ?? 0);
+        if (Number.isNaN(qty)) {
+          skipped++;
+          continue;
+        }
+        await prisma.inventory.upsert({
+          where: { productId_grade: { productId: product.id, grade } },
+          create: { productId: product.id, grade, quantity: qty, reserved: 0, unit: 'M2' },
+          update: { quantity: qty },
+        });
+        updated++;
+      }
+      res.json({ updated, skipped, errors: errors.slice(0, 20) });
+    } finally {
+      deleteFile(req.file.filename);
+    }
   }),
 );
 

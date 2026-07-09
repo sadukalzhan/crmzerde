@@ -19,23 +19,25 @@ const planItemInclude = {
       items: { include: { product: true } },
     },
   },
+  orderItem: { include: { product: true } },
 } satisfies Prisma.ProductionPlanItemInclude;
 
 type PlanItemRow = Prisma.ProductionPlanItemGetPayload<{ include: typeof planItemInclude }>;
 
-// Обогащаем позицию плана вычисляемыми колонками (формат, объёмы, коробки, итог).
+// Обогащаем позицию плана вычисляемыми колонками (товар, формат, объёмы, коробки, итог).
+// План ведётся по позициям заявки (товар+сорт), поэтому у многотоварной заявки — несколько строк.
 function enrich(item: PlanItemRow) {
   const order = item.order;
-  const first = order.items[0];
-  const product = first?.product;
+  const product = item.orderItem?.product ?? order.items[0]?.product;
   const format = product?.format ?? '60x60';
-  const grade = first?.grade ?? 'A';
-  const orderedM2 = order.quantity;
+  const grade = item.grade || item.orderItem?.grade || 'A';
+  const orderedM2 = item.quantity || order.quantity; // объём в производство (нехватка)
   const total = item.gradeA + item.gradeB + item.gradeC + item.gradeBrak;
   return {
     ...item,
     customer: order.client?.companyName ?? '',
     orderNumber: order.number,
+    productName: product?.name ?? '',
     format,
     collection: product?.collection ?? '',
     color: product?.color ?? '',

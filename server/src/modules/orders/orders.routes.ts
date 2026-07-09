@@ -150,4 +150,14 @@ router.patch(
   }),
 );
 
+// Удаление заявки (админ)
+router.delete(
+  '/:id',
+  requireRole('ADMIN'),
+  asyncHandler(async (req, res) => {
+    await service.deleteOrder(req.params.id);
+    res.json({ ok: true });
+  }),
+);
+
 export default router;

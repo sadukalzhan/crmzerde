@@ -172,6 +172,20 @@ export interface Order {
   productionPlanItems?: { id: string; priority: number; status: string; plan?: { year: number; month: number } }[];
 }
 
+export interface Reservation {
+  id: string;
+  orderId: string;
+  productId: string;
+  grade: Grade;
+  quantity: number;
+  boxes?: number;
+  pallets?: number;
+  createdAt: string;
+  createdBy?: { fullName: string; role: Role } | null;
+  product?: Product;
+  order?: { number: number; status: string; client?: { companyName: string }; manager?: { fullName: string } | null };
+}
+
 export interface Notification {
   id: string;
   type: string;

@@ -13,6 +13,7 @@ const ru: Dict = {
   'nav.specifications': 'Спецификации',
   'nav.analytics': 'Аналитика',
   'nav.inventory': 'Остатки',
+  'nav.reservations': 'Резервы',
   'nav.calendar': 'Календарь',
   'nav.clients': 'Клиенты',
   'nav.users': 'Пользователи',

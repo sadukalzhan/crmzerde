@@ -18,6 +18,7 @@ import documentsRoutes from './modules/documents/documents.routes';
 import filesRoutes from './modules/files/files.routes';
 import productionRoutes from './modules/production/production.routes';
 import inventoryRoutes from './modules/inventory/inventory.routes';
+import reservationsRoutes from './modules/reservations/reservations.routes';
 import claimsRoutes from './modules/claims/claims.routes';
 import notificationsRoutes from './modules/notifications/notifications.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
@@ -47,6 +48,7 @@ export function createApp() {
   app.use('/api/files', filesRoutes);
   app.use('/api/production', productionRoutes);
   app.use('/api/inventory', inventoryRoutes);
+  app.use('/api/reservations', reservationsRoutes);
   app.use('/api/claims', claimsRoutes);
   app.use('/api/notifications', notificationsRoutes);
   app.use('/api/analytics', analyticsRoutes);

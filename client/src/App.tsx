@@ -19,6 +19,7 @@ import SpecificationsPage from './pages/SpecificationsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ProductionPage from './pages/ProductionPage';
 import InventoryPage from './pages/InventoryPage';
+import ReservationsPage from './pages/ReservationsPage';
 import CalendarPage from './pages/CalendarPage';
 import ClientsPage from './pages/ClientsPage';
 import ProfilePage from './pages/ProfilePage';
@@ -86,6 +87,7 @@ export default function App() {
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/production" element={<ProductionPage />} />
         <Route path="/inventory" element={<InventoryPage />} />
+        <Route path="/reservations" element={<ReservationsPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/admin/users" element={<UsersPage />} />

@@ -163,13 +163,13 @@ export async function availabilityFor(orderId: string) {
 
 // ── Резервирование ───────────────────────────────────────────────────────────
 
-async function reserveStock(orderId: string) {
+async function reserveStock(orderId: string, actor: AuthUser) {
   const avail = await availabilityFor(orderId);
   await prisma.$transaction(async (tx) => {
     for (const line of avail.lines) {
       if (line.covered <= 0) continue;
       await tx.reservation.create({
-        data: { orderId, productId: line.productId, quantity: line.covered },
+        data: { orderId, productId: line.productId, grade: line.grade, quantity: line.covered, createdById: actor.id },
       });
       await tx.inventory.updateMany({
         where: { productId: line.productId, grade: line.grade },
@@ -178,6 +178,62 @@ async function reserveStock(orderId: string) {
     }
   });
   return avail;
+}
+
+/** Нехватка по позициям заявки = нужно − зарезервировано (по резервам, а не по свободному остатку). */
+async function orderShortages(orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: { include: { product: true } }, reservations: true },
+  });
+  if (!order) throw notFound('Заявка не найдена');
+  return order.items.map((item) => {
+    const reserved = order.reservations
+      .filter((r) => r.productId === item.productId && r.grade === item.grade)
+      .reduce((s, r) => s + r.quantity, 0);
+    return {
+      item,
+      productId: item.productId,
+      grade: item.grade,
+      name: item.product.name,
+      needed: item.quantity,
+      reserved,
+      hadReservation: order.reservations.length > 0,
+      shortage: Math.max(0, item.quantity - reserved),
+    };
+  });
+}
+
+/** Отгрузка: снимаем резерв и списываем остаток по всем позициям. */
+async function consumeStockOnShipment(orderId: string) {
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, reservations: true } });
+  if (!order) return;
+  await prisma.$transaction(async (tx) => {
+    // снять резервы
+    for (const r of order.reservations) {
+      const inv = await tx.inventory.findUnique({ where: { productId_grade: { productId: r.productId, grade: r.grade } } });
+      if (inv) await tx.inventory.update({ where: { id: inv.id }, data: { reserved: Math.max(0, inv.reserved - r.quantity) } });
+    }
+    await tx.reservation.deleteMany({ where: { orderId } });
+    // списать остаток по фактически отгруженным позициям
+    for (const item of order.items) {
+      const inv = await tx.inventory.findUnique({ where: { productId_grade: { productId: item.productId, grade: item.grade } } });
+      if (inv) await tx.inventory.update({ where: { id: inv.id }, data: { quantity: Math.max(0, inv.quantity - item.quantity) } });
+    }
+  });
+}
+
+/** Удаление заявки (админ): освобождаем резервы, затем каскадно удаляем. */
+export async function deleteOrder(orderId: string) {
+  const reservations = await prisma.reservation.findMany({ where: { orderId } });
+  await prisma.$transaction(async (tx) => {
+    for (const r of reservations) {
+      const inv = await tx.inventory.findUnique({ where: { productId_grade: { productId: r.productId, grade: r.grade } } });
+      if (inv) await tx.inventory.update({ where: { id: inv.id }, data: { reserved: Math.max(0, inv.reserved - r.quantity) } });
+    }
+    await tx.order.delete({ where: { id: orderId } });
+  });
+  emitBoardChanged({ reason: 'deleted', orderId });
 }
 
 // ── Постановка в план производства (правило 15-го числа + приоритет) ──────────
@@ -196,11 +252,32 @@ export async function addToProductionPlan(orderId: string, actor: AuthUser) {
     update: {},
   });
 
-  const existing = await prisma.productionPlanItem.findFirst({ where: { orderId, planId: plan.id } });
-  if (!existing) {
-    await prisma.productionPlanItem.create({
-      data: { planId: plan.id, orderId, priority, status: 'PLANNED', startDate },
+  // Ставим в план ВСЕ позиции заявки, которых не хватает на доступном остатке
+  // (по каждому товару+сорту — свой объём производства = нехватка).
+  const shortages = await orderShortages(orderId);
+  let created = 0;
+  for (const s of shortages) {
+    // Если резервов не было (заявка идёт в производство без резерва) — производим весь объём позиции.
+    const produceQty = s.shortage > 0 ? s.shortage : s.hadReservation ? 0 : s.needed;
+    if (produceQty <= 0) continue;
+    const existing = await prisma.productionPlanItem.findFirst({
+      where: { orderId, planId: plan.id, orderItemId: s.item.id },
     });
+    if (!existing) {
+      await prisma.productionPlanItem.create({
+        data: {
+          planId: plan.id,
+          orderId,
+          orderItemId: s.item.id,
+          grade: s.grade,
+          quantity: produceQty,
+          priority,
+          status: 'PLANNED',
+          startDate,
+        },
+      });
+      created++;
+    }
   }
 
   await prisma.order.update({
@@ -210,12 +287,12 @@ export async function addToProductionPlan(orderId: string, actor: AuthUser) {
 
   await notifyRole('FACTORY', {
     type: 'PLAN_ADDED',
-    title: `Новая позиция в плане: #${order.number}`,
-    body: `Плановый месяц ${String(month).padStart(2, '0')}.${year}, приоритет ${priority}`,
+    title: `Новые позиции в плане: #${order.number}`,
+    body: `Плановый месяц ${String(month).padStart(2, '0')}.${year}, позиций: ${created}, приоритет ${priority}`,
     orderId,
   });
 
-  return { plan, priority, startDate };
+  return { plan, priority, startDate, created };
 }
 
 // ── Универсальный переход по статусу (drag-and-drop канбана) ──────────────────
@@ -243,6 +320,15 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
   const data: Prisma.OrderUpdateInput = { status: to };
   let note = input.note;
 
+  // Нельзя пропустить производство, если под заявку не хватает доступного остатка.
+  if (from === 'RESERVATION' && (to === 'READY' || to === 'SHIPMENT')) {
+    const shorts = await orderShortages(orderId);
+    const totalShort = shorts.reduce((s, x) => s + x.shortage, 0);
+    if (totalShort > 0) {
+      throw new ApiError(409, 'Недостаточно доступного остатка под заявку — сначала переведите в производство.');
+    }
+  }
+
   // ── Побочные эффекты и guard'ы по целевому статусу ──
   switch (to) {
     case 'SPEC_PREPARATION': {
@@ -268,7 +354,7 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
       break;
     }
     case 'RESERVATION': {
-      const avail = await reserveStock(orderId);
+      const avail = await reserveStock(orderId, actor);
       note = note ?? `Резерв: ${avail.status === 'FULL' ? 'полный' : avail.status === 'PARTIAL' ? 'частичный' : 'нет наличия'}`;
       break;
     }
@@ -284,6 +370,8 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
       if (!hasTTN || !hasUPD) {
         throw badRequest('Для отгрузки нужно прикрепить ТТН и УПД');
       }
+      // Отгрузка: снимаем резерв и списываем остаток.
+      await consumeStockOnShipment(orderId);
       break;
     }
     case 'POSTPAYMENT': {

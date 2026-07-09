@@ -33,6 +33,7 @@ interface PlanItem {
   total: number;
   customer: string;
   orderNumber: number;
+  productName: string;
   format: string;
   collection: string;
   color: string;
@@ -92,6 +93,7 @@ export default function ProductionPage() {
                 <tr className="border-b border-border text-left text-xs uppercase text-muted-2">
                   <th className="px-3 py-3 font-medium">Заявка</th>
                   <th className="px-3 py-3 font-medium">Заказчик</th>
+                  <th className="px-3 py-3 font-medium">Товар</th>
                   <th className="px-3 py-3 font-medium">Дата начала</th>
                   <th className="px-3 py-3 font-medium">Формат</th>
                   <th className="px-3 py-3 text-right font-medium">Упаковка (кор.)</th>
@@ -122,6 +124,7 @@ export default function ProductionPage() {
                         <span className={cn('ml-1 rounded px-1 text-[10px]', it.priority === 1 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-500/20 text-muted')}>П{it.priority}</span>
                       </td>
                       <td className="px-3 py-2.5 text-slate-200">{it.customer || '—'}</td>
+                      <td className="px-3 py-2.5 text-slate-200">{it.productName || '—'}</td>
                       <td className="px-3 py-2.5 text-muted">{fmtDate(it.startDate)}</td>
                       <td className="px-3 py-2.5 text-muted">{FORMAT_LABELS[it.format] ?? it.format}</td>
                       <td className="px-3 py-2.5 text-right text-muted">{it.boxes}</td>

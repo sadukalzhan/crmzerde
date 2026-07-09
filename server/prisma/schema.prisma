@@ -39,6 +39,7 @@ model User {
   historyEntries    OrderHistory[]       @relation("HistoryActor")
   documentsUploaded Document[]           @relation("DocUploader")
   claimsCreated     Claim[]              @relation("ClaimCreator")
+  reservationsMade  Reservation[]        @relation("ReservationCreator")
   notifications     Notification[]
   resetTokens       PasswordResetToken[]
 
@@ -200,6 +201,8 @@ model OrderItem {
   unit         String  @default("M2")
   grade        String  @default("A") // A | B | C | BRAK
   pricePerUnit Float   @default(0)
+
+  productionPlanItems ProductionPlanItem[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -280,6 +283,13 @@ model ProductionPlanItem {
   plan      ProductionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
   orderId   String
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Конкретная позиция заявки (товар+сорт), которую производим (может быть несколько на заявку)
+  orderItemId String?
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  grade       String     @default("A")
+  quantity    Float      @default(0) // объём в производство (нехватка), м²
+
   priority  Int      @default(2) // 1 = аванс (первая очередь), 2 = постоплата
   status    String   @default("PLANNED") // PLANNED | IN_PRODUCTION | PRODUCED | TRANSFERRED
   startDate DateTime? // дата начала производства (правило 15-го числа)
@@ -311,13 +321,16 @@ model Inventory {
 }
 
 model Reservation {
-  id        String   @id @default(cuid())
-  orderId   String
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product  @relation(fields: [productId], references: [id])
-  quantity  Float
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  grade       String   @default("A")
+  quantity    Float // м²
+  createdById String?
+  createdBy   User?    @relation("ReservationCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

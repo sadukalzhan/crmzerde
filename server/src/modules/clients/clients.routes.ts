@@ -4,7 +4,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validateBody } from '../../middleware/validate';
-import { asyncHandler } from '../../middleware/error';
+import { asyncHandler, conflict } from '../../middleware/error';
 
 const router = Router();
 router.use(authenticate);
@@ -78,6 +78,18 @@ router.patch(
   ),
   asyncHandler(async (req, res) => {
     res.json(await prisma.client.update({ where: { id: req.params.id }, data: req.body }));
+  }),
+);
+
+// Удаление клиента (админ). Блокируем, если у клиента есть заявки.
+router.delete(
+  '/:id',
+  requireRole('ADMIN'),
+  asyncHandler(async (req, res) => {
+    const count = await prisma.order.count({ where: { clientId: req.params.id } });
+    if (count > 0) throw conflict(`У клиента есть заявки (${count}) — сначала удалите их`);
+    await prisma.client.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
   }),
 );
 

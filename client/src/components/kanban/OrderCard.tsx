@@ -1,13 +1,19 @@
-import { Factory, MapPin, Calendar, Wallet } from 'lucide-react';
+import { Factory, MapPin, Calendar, Wallet, Truck } from 'lucide-react';
 import { useMeta } from '../../lib/queries';
-import { fmtDate, fmtVolume } from '../../lib/format';
+import { fmtDate, fmtM2 } from '../../lib/format';
+import { boxes, pallets } from '../../lib/packaging';
 import { PriorityDot, ProductionPriorityBadge } from '../badges';
 import type { Order } from '../../lib/types';
 
 export function OrderCard({ order, onClick }: { order: Order; onClick?: () => void }) {
   const { data: meta } = useMeta();
-  const productName = order.items?.[0]?.product?.name ?? 'Без номенклатуры';
+  const first = order.items?.[0];
+  const productName = first?.product?.name ?? 'Без номенклатуры';
   const extra = (order.items?.length ?? 0) - 1;
+  const fmt = first?.product?.format ?? '60x60';
+  const grade = first?.grade ?? 'A';
+  const boxCount = boxes(order.quantity, fmt, grade);
+  const palletCount = pallets(order.quantity, fmt, grade);
 
   return (
     <div
@@ -24,9 +30,17 @@ export function OrderCard({ order, onClick }: { order: Order; onClick?: () => vo
         {extra > 0 && <span className="text-muted-2"> +{extra}</span>}
       </div>
 
-      <div className="mb-2 text-xs font-semibold text-accent">{fmtVolume(order.quantity, order.unit)}</div>
+      <div className="mb-2 text-xs font-semibold text-accent">
+        {fmtM2(order.quantity)}
+        <span className="ml-1 font-normal text-muted-2">· {boxCount} кор. · {palletCount} под.</span>
+      </div>
 
       <div className="space-y-1 text-[11px] text-muted">
+        {order.selfPickup && (
+          <div className="flex items-center gap-1.5 text-accent">
+            <Truck size={12} /> <span>Самовывоз</span>
+          </div>
+        )}
         {order.shipFrom && (
           <div className="flex items-center gap-1.5">
             <Factory size={12} className="text-muted-2" />

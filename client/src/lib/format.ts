@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
+import { boxes, pallets } from './packaging';
 
 dayjs.locale('ru');
 
@@ -30,8 +31,20 @@ export function fmtUnit(unit: string): string {
   return UNIT_SHORT[unit] ?? unit;
 }
 
-export function fmtVolume(qty: number, unit: string): string {
-  return `${qty} ${fmtUnit(unit)}`;
+const numRu = (n: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(n || 0);
+
+export function fmtM2(m2: number): string {
+  return `${numRu(m2)} м²`;
+}
+
+/** Объём в м² (базовая единица). */
+export function fmtVolume(qty: number, _unit?: string): string {
+  return fmtM2(qty);
+}
+
+/** Полная упаковка: «X м² · Y кор. · Z под.» по формату и сорту. */
+export function fmtPack(m2: number, format: string, grade = 'A'): string {
+  return `${fmtM2(m2)} · ${boxes(m2, format, grade)} кор. · ${pallets(m2, format, grade)} под.`;
 }
 
 export function relativeTime(date: string | Date): string {

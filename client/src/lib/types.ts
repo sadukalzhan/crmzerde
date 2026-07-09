@@ -21,7 +21,9 @@ export type OrderStatus =
 export type Priority = 'HIGH' | 'MEDIUM' | 'LOW';
 export type PaymentTerm = 'PREPAYMENT' | 'POSTPAYMENT';
 export type PaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID' | 'POSTPAY_APPROVED';
-export type Unit = 'PALLET' | 'M2';
+export type Unit = 'M2' | 'PALLET';
+export type Grade = 'A' | 'B' | 'C' | 'BRAK';
+export type Format = '60x60' | '120x60';
 
 export interface User {
   id: string;
@@ -52,21 +54,27 @@ export interface Client {
 export interface Product {
   id: string;
   name: string;
+  format: Format;
   size?: string | null;
   collection?: string | null;
+  color?: string | null;
+  surface?: string | null;
   unit: Unit;
   pricePerUnit: number;
   isActive: boolean;
-  inventory?: Inventory | null;
+  inventory?: Inventory[];
 }
 
 export interface Inventory {
   id: string;
   productId: string;
+  grade: Grade;
   quantity: number;
   reserved: number;
   unit: Unit;
   free?: number;
+  boxes?: number;
+  pallets?: number;
   product?: Product;
 }
 
@@ -75,6 +83,7 @@ export interface OrderItem {
   productId: string;
   quantity: number;
   unit: Unit;
+  grade: Grade;
   pricePerUnit: number;
   product?: Product;
 }
@@ -139,6 +148,7 @@ export interface Order {
   paymentStatus: PaymentStatus;
   quantity: number;
   unit: Unit;
+  selfPickup: boolean;
   shipFrom?: string | null;
   shipTo?: string | null;
   route?: string | null;
@@ -194,6 +204,12 @@ export interface Meta {
   paymentTermLabels: Record<string, string>;
   paymentStatusLabels: Record<string, string>;
   priorityLabels: Record<string, string>;
+  formats: Format[];
+  formatLabels: Record<string, string>;
+  formatSpecs: Record<string, { m2PerBox: number; boxesPerPallet: number; m2PerTile: number; maxTilesPerPallet: number }>;
+  grades: Grade[];
+  gradeLabels: Record<string, string>;
+  surfaces: string[];
   documentTypes: Record<string, string>;
 }
 

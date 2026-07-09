@@ -6,7 +6,8 @@ import { PageLoader, EmptyState, Modal, Field } from '../../components/ui';
 import { useFactories, useCarriers, useProducts } from '../../lib/queries';
 import { api, apiError } from '../../lib/api';
 import { toast } from '../../components/toast';
-import { fmtMoney, fmtUnit } from '../../lib/format';
+import { fmtMoney } from '../../lib/format';
+import { FORMAT_LABELS } from '../../lib/packaging';
 import { cn } from '../../lib/cn';
 
 type Tab = 'factories' | 'carriers' | 'products';
@@ -75,9 +76,14 @@ export default function RefsPage() {
               <li key={p.id} className="flex items-center justify-between px-4 py-3">
                 <div>
                   <div className="font-medium text-slate-100">{p.name}</div>
-                  <div className="text-xs text-muted">{p.collection} · {p.size} · {fmtUnit(p.unit)}</div>
+                  <div className="text-xs text-muted">
+                    {FORMAT_LABELS[p.format] ?? p.format}
+                    {p.collection && ` · ${p.collection}`}
+                    {p.color && ` · ${p.color}`}
+                    {p.surface && ` · ${p.surface}`}
+                  </div>
                 </div>
-                <span className="text-sm font-medium text-slate-200">{fmtMoney(p.pricePerUnit)}</span>
+                <span className="text-sm font-medium text-slate-200">{fmtMoney(p.pricePerUnit)}/м²</span>
               </li>
             ))}
           </ul>
@@ -103,8 +109,12 @@ function AddModal({ tab, open, onClose, onDone }: { tab: Tab; open: boolean; onC
         onDone('carriers');
       } else {
         await api.post('/products', {
-          name: form.name, size: form.size, collection: form.collection,
-          unit: form.unit || 'PALLET', pricePerUnit: Number(form.price || 0),
+          name: form.name,
+          format: form.format || '60x60',
+          collection: form.collection || undefined,
+          color: form.color || undefined,
+          surface: form.surface || undefined,
+          pricePerUnit: Number(form.price || 0),
         });
         onDone('products');
       }
@@ -132,20 +142,21 @@ function AddModal({ tab, open, onClose, onDone }: { tab: Tab; open: boolean; onC
         )}
         {tab === 'products' && (
           <>
-            <Field label="Название"><input className="input" value={form.name ?? ''} onChange={set('name')} /></Field>
+            <Field label="Название"><input className="input" value={form.name ?? ''} onChange={set('name')} placeholder="Cemento Ivory" /></Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Размер"><input className="input" value={form.size ?? ''} onChange={set('size')} placeholder="60×60" /></Field>
+              <Field label="Формат">
+                <select className="input" value={form.format ?? '60x60'} onChange={set('format')}>
+                  <option value="60x60">60×60</option>
+                  <option value="120x60">120×60</option>
+                </select>
+              </Field>
               <Field label="Коллекция"><input className="input" value={form.collection ?? ''} onChange={set('collection')} /></Field>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Единица">
-                <select className="input" value={form.unit ?? 'PALLET'} onChange={set('unit')}>
-                  <option value="PALLET">Паллета</option>
-                  <option value="M2">м²</option>
-                </select>
-              </Field>
-              <Field label="Цена"><input className="input" type="number" value={form.price ?? ''} onChange={set('price')} /></Field>
+              <Field label="Цвет"><input className="input" value={form.color ?? ''} onChange={set('color')} /></Field>
+              <Field label="Поверхность (технология)"><input className="input" value={form.surface ?? ''} onChange={set('surface')} placeholder="Матовая" /></Field>
             </div>
+            <Field label="Цена за м²"><input className="input" type="number" value={form.price ?? ''} onChange={set('price')} /></Field>
           </>
         )}
       </div>

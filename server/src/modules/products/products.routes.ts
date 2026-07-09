@@ -5,6 +5,7 @@ import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validateBody } from '../../middleware/validate';
 import { asyncHandler } from '../../middleware/error';
+import { GRADES } from '../../domain/packaging';
 
 const router = Router();
 router.use(authenticate);
@@ -25,10 +26,12 @@ router.get(
 
 const productSchema = z.object({
   name: z.string().min(2),
+  format: z.enum(['60x60', '120x60']).default('60x60'),
   size: z.string().optional(),
   collection: z.string().optional(),
-  unit: z.enum(['PALLET', 'M2']).default('PALLET'),
-  pricePerUnit: z.number().nonnegative().default(0),
+  color: z.string().optional(),
+  surface: z.string().optional(),
+  pricePerUnit: z.number().nonnegative().default(0), // цена за м²
 });
 
 router.post(
@@ -37,7 +40,12 @@ router.post(
   validateBody(productSchema),
   asyncHandler(async (req, res) => {
     const product = await prisma.product.create({
-      data: { ...req.body, inventory: { create: { quantity: 0, reserved: 0, unit: req.body.unit } } },
+      data: {
+        ...req.body,
+        unit: 'M2',
+        // По строке склада на каждый сорт (A/B/C/BRAK), начальный остаток 0.
+        inventory: { create: GRADES.map((grade) => ({ grade, quantity: 0, reserved: 0, unit: 'M2' })) },
+      },
       include: { inventory: true },
     });
     res.status(201).json(product);

@@ -7,6 +7,14 @@ import {
   PAYMENT_STATUS_LABELS,
   PRIORITY_LABELS,
 } from '../../domain/businessRules';
+import {
+  FORMATS,
+  FORMAT_LABELS,
+  FORMAT_SPECS,
+  GRADES,
+  GRADE_LABELS,
+  SURFACES,
+} from '../../domain/packaging';
 
 const router = Router();
 
@@ -21,6 +29,12 @@ router.get('/', (_req, res) => {
     paymentTermLabels: PAYMENT_TERM_LABELS,
     paymentStatusLabels: PAYMENT_STATUS_LABELS,
     priorityLabels: PRIORITY_LABELS,
+    formats: FORMATS,
+    formatLabels: FORMAT_LABELS,
+    formatSpecs: FORMAT_SPECS,
+    grades: GRADES,
+    gradeLabels: GRADE_LABELS,
+    surfaces: SURFACES,
     documentTypes: {
       TTN: 'ТТН',
       UPD: 'УПД',

@@ -165,11 +165,13 @@ export const useProductionPlan = (year: number, month: number) =>
     queryFn: async () => (await api.get(`/production/plan`, { params: { year, month } })).data,
   });
 
-export const usePlanItemStatus = () => {
+export const usePlanItemUpdate = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (vars: { id: string; status: string }) =>
-      (await api.post(`/production/items/${vars.id}/status`, { status: vars.status })).data,
+    mutationFn: async (vars: { id: string } & Record<string, unknown>) => {
+      const { id, ...data } = vars;
+      return (await api.patch(`/production/items/${id}`, data)).data;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['production'] });
       qc.invalidateQueries({ queryKey: ['orders'] });

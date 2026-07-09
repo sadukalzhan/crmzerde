@@ -58,12 +58,13 @@ export interface CreateOrderInput {
   managerId?: string;
   factoryId?: string;
   carrierId?: string;
+  selfPickup?: boolean;
   priority?: string;
   paymentTerm?: string;
   shipFrom?: string;
   shipTo?: string;
   desiredDate?: string;
-  items: { productId: string; quantity: number; unit?: string; pricePerUnit?: number }[];
+  items: { productId: string; quantity: number; grade?: string; pricePerUnit?: number }[];
 }
 
 export async function createOrder(input: CreateOrderInput, actor: AuthUser) {
@@ -83,7 +84,7 @@ export async function createOrder(input: CreateOrderInput, actor: AuthUser) {
 
   const totalQty = input.items.reduce((s, i) => s + i.quantity, 0);
   const number = await nextOrderNumber();
-  const unit = input.items[0]?.unit ?? 'PALLET';
+  const selfPickup = input.selfPickup ?? false;
 
   const order = await prisma.order.create({
     data: {
@@ -92,7 +93,8 @@ export async function createOrder(input: CreateOrderInput, actor: AuthUser) {
       priority: input.priority ?? 'MEDIUM',
       paymentTerm: input.paymentTerm ?? 'PREPAYMENT',
       quantity: totalQty,
-      unit,
+      unit: 'M2',
+      selfPickup,
       shipFrom: input.shipFrom,
       shipTo: input.shipTo,
       route: buildRoute(input.shipFrom, input.shipTo),
@@ -100,12 +102,13 @@ export async function createOrder(input: CreateOrderInput, actor: AuthUser) {
       clientId,
       managerId: input.managerId ?? client.managerId ?? null,
       factoryId: input.factoryId,
-      carrierId: input.carrierId,
+      carrierId: selfPickup ? null : input.carrierId,
       items: {
         create: input.items.map((i) => ({
           productId: i.productId,
           quantity: i.quantity,
-          unit: i.unit ?? 'PALLET',
+          unit: 'M2',
+          grade: i.grade ?? 'A',
           pricePerUnit: i.pricePerUnit ?? 0,
         })),
       },
@@ -137,10 +140,11 @@ export async function availabilityFor(orderId: string) {
   if (!order) throw notFound('Заявка не найдена');
 
   const lines = order.items.map((item) => {
-    const inv = item.product.inventory;
+    const inv = item.product.inventory.find((x) => x.grade === item.grade);
     const free = inv ? inv.quantity - inv.reserved : 0;
     return {
       productId: item.productId,
+      grade: item.grade,
       name: item.product.name,
       needed: item.quantity,
       free,
@@ -168,7 +172,7 @@ async function reserveStock(orderId: string) {
         data: { orderId, productId: line.productId, quantity: line.covered },
       });
       await tx.inventory.updateMany({
-        where: { productId: line.productId },
+        where: { productId: line.productId, grade: line.grade },
         data: { reserved: { increment: line.covered } },
       });
     }

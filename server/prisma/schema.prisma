@@ -90,15 +90,18 @@ model Client {
 
 model Product {
   id           String   @id @default(cuid())
-  name         String // «Cemento Ivory Carving 60×60»
-  size         String? // «60×60»
+  name         String // «Cemento Ivory Carving»
+  format       String   @default("60x60") // 60x60 | 120x60
+  size         String? // legacy / произвольный размер
   collection   String? // «Cemento»
-  unit         String   @default("PALLET") // PALLET | M2
-  pricePerUnit Float    @default(0)
+  color        String? // цвет
+  surface      String? // технология / поверхность
+  unit         String   @default("M2") // базовая единица — м²
+  pricePerUnit Float    @default(0) // цена за м²
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  inventory          Inventory?
+  inventory          Inventory[]
   orderItems         OrderItem[]
   specificationItems SpecificationItem[]
   reservations       Reservation[]
@@ -139,13 +142,14 @@ model Order {
   paymentTerm   String @default("PREPAYMENT") // PREPAYMENT | POSTPAYMENT
   paymentStatus String @default("UNPAID") // UNPAID | PARTIAL | PAID | POSTPAY_APPROVED
 
-  // Объём заявки (агрегированно для карточки), детально — в items
+  // Объём заявки в м² (агрегированно для карточки), детально — в items
   quantity Float  @default(0)
-  unit     String @default("PALLET") // PALLET | M2
+  unit     String @default("M2")
 
-  shipFrom String? // завод-отгрузка, «Актобе»
-  shipTo   String? // «Москва-Бронницы»
-  route    String? // «Актобе → Москва-Бронницы»
+  selfPickup Boolean @default(false) // самовывоз (без перевозчика)
+  shipFrom   String? // завод-отгрузка, «Актобе»
+  shipTo     String? // «Москва-Бронницы»
+  route      String? // «Актобе → Москва-Бронницы»
 
   desiredDate         DateTime? // желаемая дата клиента
   productionStartDate DateTime? // дата запуска (правило 15-го числа)
@@ -192,8 +196,9 @@ model OrderItem {
   order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId    String
   product      Product @relation(fields: [productId], references: [id])
-  quantity     Float
-  unit         String  @default("PALLET")
+  quantity     Float // м²
+  unit         String  @default("M2")
+  grade        String  @default("A") // A | B | C | BRAK
   pricePerUnit Float   @default(0)
 }
 
@@ -225,7 +230,7 @@ model SpecificationItem {
   product         Product?      @relation(fields: [productId], references: [id])
   name            String
   quantity        Float
-  unit            String        @default("PALLET")
+  unit            String        @default("M2")
   price           Float         @default(0)
   sum             Float         @default(0)
 }
@@ -277,18 +282,32 @@ model ProductionPlanItem {
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   priority  Int      @default(2) // 1 = аванс (первая очередь), 2 = постоплата
   status    String   @default("PLANNED") // PLANNED | IN_PRODUCTION | PRODUCED | TRANSFERRED
-  startDate DateTime?
+  startDate DateTime? // дата начала производства (правило 15-го числа)
+  endDate   DateTime? // дата окончания производства
+
+  // Фактический выпуск по сортам (м²)
+  gradeA    Float  @default(0)
+  gradeB    Float  @default(0)
+  gradeC    Float  @default(0)
+  gradeBrak Float  @default(0)
+
+  customsDate DateTime? // таможенная очистка
+  comments    String? // комментарии с производства
+
   createdAt DateTime @default(now())
 }
 
 model Inventory {
   id        String   @id @default(cuid())
-  productId String   @unique
+  productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  quantity  Float    @default(0)
-  reserved  Float    @default(0)
-  unit      String   @default("PALLET")
+  grade     String   @default("A") // A | B | C | BRAK
+  quantity  Float    @default(0) // м²
+  reserved  Float    @default(0) // м²
+  unit      String   @default("M2")
   updatedAt DateTime @updatedAt
+
+  @@unique([productId, grade])
 }
 
 model Reservation {

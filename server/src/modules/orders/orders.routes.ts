@@ -14,6 +14,7 @@ const createSchema = z.object({
   managerId: z.string().optional(),
   factoryId: z.string().optional(),
   carrierId: z.string().optional(),
+  selfPickup: z.boolean().optional(),
   priority: z.enum(['HIGH', 'MEDIUM', 'LOW']).optional(),
   paymentTerm: z.enum(['PREPAYMENT', 'POSTPAYMENT']).optional(),
   shipFrom: z.string().optional(),
@@ -24,7 +25,7 @@ const createSchema = z.object({
       z.object({
         productId: z.string(),
         quantity: z.number().positive(),
-        unit: z.enum(['PALLET', 'M2']).optional(),
+        grade: z.enum(['A', 'B', 'C', 'BRAK']).optional(),
         pricePerUnit: z.number().nonnegative().optional(),
       }),
     )
@@ -46,6 +47,7 @@ const updateSchema = z.object({
   managerId: z.string().nullable().optional(),
   factoryId: z.string().nullable().optional(),
   carrierId: z.string().nullable().optional(),
+  selfPickup: z.boolean().optional(),
   shipFrom: z.string().optional(),
   shipTo: z.string().optional(),
   desiredDate: z.string().nullable().optional(),

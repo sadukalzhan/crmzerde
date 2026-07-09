@@ -21,7 +21,7 @@ echo "==> Применение схемы к БД"
 cd server
 npx prisma db push --skip-generate --accept-data-loss
 
-echo "==> Сид демо-данными (только если БД пустая)"
-npx tsx scripts/seed-if-empty.ts
+echo "==> Сид (один раз на версию модели данных)"
+npx tsx scripts/seed-if-needed.ts
 
 echo "==> Готово"

@@ -15,7 +15,8 @@ import {
 } from '../lib/queries';
 import { api, apiError, fileHref } from '../lib/api';
 import { toast } from '../components/toast';
-import { fmtDate, fmtDateTime, fmtMoney, fmtVolume } from '../lib/format';
+import { fmtDate, fmtDateTime, fmtMoney, fmtM2 } from '../lib/format';
+import { boxes, pallets, GRADE_LABELS } from '../lib/packaging';
 import { useAuth } from '../lib/store';
 import { useQueryClient } from '@tanstack/react-query';
 import type { OrderStatus } from '../lib/types';
@@ -158,20 +159,27 @@ export default function OrderDetailPage() {
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase text-muted-2">
                     <th className="py-2 pr-4 font-medium">Номенклатура</th>
-                    <th className="py-2 pr-4 font-medium">Кол-во</th>
-                    {isStaff && <th className="py-2 pr-4 font-medium">Цена</th>}
+                    <th className="py-2 pr-4 font-medium">Сорт</th>
+                    <th className="py-2 pr-4 font-medium">Объём (м² · кор. · под.)</th>
+                    {isStaff && <th className="py-2 pr-4 font-medium">Цена/м²</th>}
                     {isStaff && <th className="py-2 font-medium">Сумма</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {order.items.map((it) => (
-                    <tr key={it.id}>
-                      <td className="py-2.5 pr-4 text-slate-200">{it.product?.name ?? '—'}</td>
-                      <td className="py-2.5 pr-4 text-muted">{fmtVolume(it.quantity, it.unit)}</td>
-                      {isStaff && <td className="py-2.5 pr-4 text-muted">{fmtMoney(it.pricePerUnit)}</td>}
-                      {isStaff && <td className="py-2.5 font-medium text-slate-200">{fmtMoney(it.quantity * it.pricePerUnit)}</td>}
-                    </tr>
-                  ))}
+                  {order.items.map((it) => {
+                    const fmt = it.product?.format ?? '60x60';
+                    return (
+                      <tr key={it.id}>
+                        <td className="py-2.5 pr-4 text-slate-200">{it.product?.name ?? '—'}</td>
+                        <td className="py-2.5 pr-4 text-muted">{GRADE_LABELS[it.grade] ?? it.grade}</td>
+                        <td className="py-2.5 pr-4 text-muted">
+                          {fmtM2(it.quantity)} · {boxes(it.quantity, fmt, it.grade)} кор. · {pallets(it.quantity, fmt, it.grade)} под.
+                        </td>
+                        {isStaff && <td className="py-2.5 pr-4 text-muted">{fmtMoney(it.pricePerUnit)}</td>}
+                        {isStaff && <td className="py-2.5 font-medium text-slate-200">{fmtMoney(it.quantity * it.pricePerUnit)}</td>}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -391,7 +399,7 @@ export default function OrderDetailPage() {
             <dl className="space-y-2.5 text-sm">
               <Info label="Менеджер" value={order.manager?.fullName ?? '—'} />
               <Info label="Завод" value={order.factory?.name ?? '—'} />
-              <Info label="Перевозчик" value={order.carrier?.name ?? '—'} />
+              <Info label="Доставка" value={order.selfPickup ? 'Самовывоз' : order.carrier?.name ?? '—'} />
               <Info label="Желаемая дата" value={fmtDate(order.desiredDate)} />
               <Info label="Запуск в произв." value={fmtDate(order.productionStartDate)} />
               {order.closedAt && <Info label="Закрыта" value={fmtDate(order.closedAt)} />}

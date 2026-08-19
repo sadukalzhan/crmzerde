@@ -5,7 +5,7 @@ import { notify, notifyRole } from '../../lib/notify';
 import { emitBoardChanged } from '../../lib/realtime';
 import { ApiError, badRequest, forbidden, notFound } from '../../middleware/error';
 import { canTransition } from '../../domain/transitions';
-import { isOrderStatus, type OrderStatus } from '../../domain/orderStatus';
+import { isOrderStatus, STATUS_META, type OrderStatus } from '../../domain/orderStatus';
 import { productionPlanPeriod, productionPriority, productionStartDate } from '../../domain/businessRules';
 import type { AuthUser } from '../../middleware/auth';
 
@@ -82,6 +82,10 @@ export async function createOrder(input: CreateOrderInput, actor: AuthUser) {
   if (!client) throw notFound('Клиент не найден');
   if (!input.items?.length) throw badRequest('Добавьте хотя бы одну позицию');
 
+  // Приоритет заявки выставляют только менеджеры. Клиент, даже если пришлёт
+  // поле в запросе, получает средний приоритет по умолчанию.
+  const priority = actor.role === 'CLIENT' ? 'MEDIUM' : input.priority ?? 'MEDIUM';
+
   const totalQty = input.items.reduce((s, i) => s + i.quantity, 0);
   const number = await nextOrderNumber();
   const selfPickup = input.selfPickup ?? false;
@@ -90,7 +94,7 @@ export async function createOrder(input: CreateOrderInput, actor: AuthUser) {
     data: {
       number,
       status: 'NEW',
-      priority: input.priority ?? 'MEDIUM',
+      priority,
       paymentTerm: input.paymentTerm ?? 'PREPAYMENT',
       quantity: totalQty,
       unit: 'M2',
@@ -139,9 +143,49 @@ export async function availabilityFor(orderId: string) {
   });
   if (!order) throw notFound('Заявка не найдена');
 
+  // Регламент, п. 3-5: если позиции не хватает на свободном остатке, менеджер
+  // должен видеть, в чьём она резерве — своего клиента (такой резерв можно
+  // перебросить) или чужого партнёра (нужен запрос на снятие).
+  const holders = await prisma.reservation.findMany({
+    where: {
+      orderId: { not: orderId },
+      productId: { in: order.items.map((i) => i.productId) },
+    },
+    include: {
+      order: {
+        select: {
+          id: true,
+          number: true,
+          clientId: true,
+          client: { select: { companyName: true } },
+          manager: { select: { id: true, fullName: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
   const lines = order.items.map((item) => {
     const inv = item.product.inventory.find((x) => x.grade === item.grade);
     const free = inv ? inv.quantity - inv.reserved : 0;
+    const shortage = Math.max(0, item.quantity - free);
+
+    const reservedBy = holders
+      .filter((r) => r.productId === item.productId && r.grade === item.grade)
+      .map((r) => ({
+        reservationId: r.id,
+        quantity: r.quantity,
+        orderId: r.orderId,
+        orderNumber: r.order.number,
+        clientName: r.order.client.companyName,
+        managerName: r.order.manager?.fullName ?? null,
+        sameClient: r.order.clientId === order.clientId,
+        confirmedForShipment: r.confirmedForShipment,
+        // Резерв своего клиента, не подтверждённый под отгрузку, можно забрать
+        // на эту заявку сразу (п. 4). Остальные — только через запрос (п. 5).
+        releasable: r.order.clientId === order.clientId && !r.confirmedForShipment,
+      }));
+
     return {
       productId: item.productId,
       grade: item.grade,
@@ -149,7 +193,8 @@ export async function availabilityFor(orderId: string) {
       needed: item.quantity,
       free,
       covered: Math.min(free, item.quantity),
-      shortage: Math.max(0, item.quantity - free),
+      shortage,
+      reservedBy,
     };
   });
 
@@ -163,21 +208,32 @@ export async function availabilityFor(orderId: string) {
 
 // ── Резервирование ───────────────────────────────────────────────────────────
 
-async function reserveStock(orderId: string, actor: AuthUser) {
-  const avail = await availabilityFor(orderId);
+/**
+ * Резервирует то, что ещё не закрыто резервом по этой заявке, в пределах
+ * свободного остатка. Считает от нехватки (нужно − уже зарезервировано),
+ * поэтому безопасно вызывать повторно — на этапе резервирования и после
+ * оприходования произведённой продукции (Регламент, п. 9).
+ */
+async function reserveOutstanding(orderId: string, actor: AuthUser): Promise<number> {
+  const shortages = await orderShortages(orderId);
+  let total = 0;
   await prisma.$transaction(async (tx) => {
-    for (const line of avail.lines) {
-      if (line.covered <= 0) continue;
+    for (const s of shortages) {
+      if (s.shortage <= 0) continue;
+      const inv = await tx.inventory.findUnique({
+        where: { productId_grade: { productId: s.productId, grade: s.grade } },
+      });
+      if (!inv) continue;
+      const take = Math.min(inv.quantity - inv.reserved, s.shortage);
+      if (take <= 0) continue;
       await tx.reservation.create({
-        data: { orderId, productId: line.productId, grade: line.grade, quantity: line.covered, createdById: actor.id },
+        data: { orderId, productId: s.productId, grade: s.grade, quantity: take, createdById: actor.id },
       });
-      await tx.inventory.updateMany({
-        where: { productId: line.productId, grade: line.grade },
-        data: { reserved: { increment: line.covered } },
-      });
+      await tx.inventory.update({ where: { id: inv.id }, data: { reserved: { increment: take } } });
+      total += take;
     }
   });
-  return avail;
+  return total;
 }
 
 /** Нехватка по позициям заявки = нужно − зарезервировано (по резервам, а не по свободному остатку). */
@@ -331,16 +387,6 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
 
   // ── Побочные эффекты и guard'ы по целевому статусу ──
   switch (to) {
-    case 'SPEC_PREPARATION': {
-      // Проверка дебиторки: при долге переход запрещён (нужно в REJECTED).
-      if (order.client.debt > 0 || order.client.creditBlocked) {
-        throw new ApiError(
-          409,
-          'У клиента есть задолженность — заявку нельзя согласовать. Переведите в «Отклонено».',
-        );
-      }
-      break;
-    }
     case 'REJECTED': {
       if (!input.reason) throw badRequest('Укажите причину отклонения');
       data.rejectionReason = input.reason;
@@ -354,12 +400,30 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
       break;
     }
     case 'RESERVATION': {
-      const avail = await reserveStock(orderId, actor);
+      const avail = await availabilityFor(orderId);
+      await reserveOutstanding(orderId, actor);
       note = note ?? `Резерв: ${avail.status === 'FULL' ? 'полный' : avail.status === 'PARTIAL' ? 'частичный' : 'нет наличия'}`;
       break;
     }
     case 'PRODUCTION': {
+      // Регламент, п. 8: в производство — только после того, как клиент
+      // подтвердил готовность ждать недостающие позиции.
+      if (!order.productionAcceptedAt) {
+        throw new ApiError(
+          409,
+          'Клиент ещё не подтвердил готовность ждать производство — зафиксируйте его ответ на заявке.',
+        );
+      }
       await addToProductionPlan(orderId, actor);
+      break;
+    }
+    case 'READY': {
+      // Регламент, п. 9: после оприходования продукции складом товар сразу
+      // ставится в резерв под клиента, а не ждёт отдельного действия.
+      const reserved = await reserveOutstanding(orderId, actor);
+      if (reserved > 0) {
+        note = note ?? `Оприходовано и зарезервировано под клиента: ${reserved} м²`;
+      }
       break;
     }
     case 'SHIPMENT': {
@@ -403,13 +467,21 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
   await recordHistory(orderId, from, to, actor.id, note);
   const updated = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: orderDetailInclude });
 
-  // Уведомить клиента о смене статуса его заявки.
+  // Уведомить клиента о смене статуса его заявки. Регламент, п. 9: о поступлении
+  // товара на склад партнёр должен узнавать сразу и без напоминаний с его стороны,
+  // поэтому статус READY описывается отдельным текстом, а не кодом статуса.
   if (order.client.userId) {
     await notify({
       userId: order.client.userId,
       type: 'STATUS_CHANGE',
-      title: `Заявка #${order.number}: статус изменён`,
-      body: to,
+      title:
+        to === 'READY'
+          ? `Заявка #${order.number}: товар на складе`
+          : `Заявка #${order.number}: ${STATUS_META[to].label}`,
+      body:
+        to === 'READY'
+          ? 'Продукция поступила на склад, зарезервирована под вас и готова к отгрузке.'
+          : STATUS_META[to].hint,
       orderId,
     });
   }
@@ -418,20 +490,125 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
   return updated;
 }
 
-// ── Проверка дебиторки (автоматизация развилки) ──────────────────────────────
+// ── Регламент, п. 8: фиксация ответа клиента о готовности ждать производство ──
 
-export async function runCreditCheck(orderId: string, actor: AuthUser) {
+export async function acceptProduction(orderId: string, actor: AuthUser) {
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { client: true } });
   if (!order) throw notFound('Заявка не найдена');
 
-  if (order.client.debt > 0 || order.client.creditBlocked) {
-    return transitionOrder(
-      orderId,
-      { to: 'REJECTED', reason: `Задолженность клиента: ${order.client.debt.toLocaleString('ru-RU')}` },
-      actor,
-    );
+  // Клиент может подтвердить только свою заявку.
+  if (actor.role === 'CLIENT') {
+    const profile = await prisma.client.findUnique({ where: { userId: actor.id } });
+    if (!profile || profile.id !== order.clientId) throw forbidden();
   }
-  return transitionOrder(orderId, { to: 'SPEC_PREPARATION', note: 'Дебиторка чистая' }, actor);
+
+  if (order.productionAcceptedAt) return getOrder(orderId, actor);
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { productionAcceptedAt: new Date(), productionAcceptedBy: actor.id },
+  });
+  await recordHistory(orderId, order.status, order.status, actor.id, 'Клиент подтвердил готовность ждать производство');
+  emitBoardChanged({ reason: 'production-accepted', orderId });
+  return getOrder(orderId, actor);
+}
+
+// ── Регламент, п. 4-5: работа с чужими резервами ─────────────────────────────
+
+async function loadReservationForOrder(orderId: string, reservationId: string) {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) throw notFound('Заявка не найдена');
+
+  const reservation = await prisma.reservation.findUnique({
+    where: { id: reservationId },
+    include: {
+      product: true,
+      order: {
+        select: {
+          id: true,
+          number: true,
+          clientId: true,
+          managerId: true,
+          client: { select: { companyName: true } },
+        },
+      },
+    },
+  });
+  if (!reservation) throw notFound('Резерв не найден');
+  if (reservation.orderId === orderId) throw badRequest('Это резерв текущей заявки');
+  return { order, reservation };
+}
+
+/**
+ * Снятие резерва, стоящего за тем же клиентом и не подтверждённого под
+ * конкретную отгрузку, с переносом на текущую заявку (Регламент, п. 4).
+ */
+export async function releaseReservation(orderId: string, reservationId: string, actor: AuthUser) {
+  const { order, reservation } = await loadReservationForOrder(orderId, reservationId);
+
+  if (reservation.order.clientId !== order.clientId) {
+    throw forbidden('Резерв стоит за другим партнёром — снять его можно только по согласованию (запросите снятие).');
+  }
+  if (reservation.confirmedForShipment) {
+    throw new ApiError(409, 'Резерв подтверждён под конкретную отгрузку — снимать его нельзя.');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.reservation.delete({ where: { id: reservation.id } });
+    await tx.inventory.updateMany({
+      where: { productId: reservation.productId, grade: reservation.grade },
+      data: { reserved: { decrement: reservation.quantity } },
+    });
+  });
+
+  const moved = await reserveOutstanding(orderId, actor);
+  await recordHistory(
+    orderId,
+    order.status,
+    order.status,
+    actor.id,
+    `Резерв ${reservation.quantity} м² «${reservation.product.name}» снят с заявки #${reservation.order.number} того же клиента`,
+  );
+  emitBoardChanged({ reason: 'reservation-released', orderId });
+  return { released: reservation.quantity, reserved: moved };
+}
+
+/**
+ * Запрос на снятие резерва, стоящего за другим партнёром (Регламент, п. 5).
+ * Уходит менеджеру заявки-держателя; если менеджера нет — всем менеджерам.
+ */
+export async function requestReservationRelease(orderId: string, reservationId: string, actor: AuthUser) {
+  const { order, reservation } = await loadReservationForOrder(orderId, reservationId);
+
+  const title = `Запрос на снятие резерва: #${reservation.order.number}`;
+  const body =
+    `${reservation.quantity} м² «${reservation.product.name}» (${reservation.grade}) ` +
+    `требуются под заявку #${order.number}. Держатель: ${reservation.order.client.companyName}.`;
+
+  if (reservation.order.managerId) {
+    await notify({ userId: reservation.order.managerId, type: 'GENERIC', title, body, orderId });
+  } else {
+    await notifyRole('MANAGER', { type: 'GENERIC', title, body, orderId });
+  }
+
+  await recordHistory(
+    orderId,
+    order.status,
+    order.status,
+    actor.id,
+    `Запрошено снятие резерва с заявки #${reservation.order.number}`,
+  );
+  return { requested: true };
+}
+
+/** Пометить резерв подтверждённым под конкретную отгрузку (Регламент, п. 4). */
+export async function setReservationConfirmed(reservationId: string, confirmed: boolean) {
+  const reservation = await prisma.reservation.findUnique({ where: { id: reservationId } });
+  if (!reservation) throw notFound('Резерв не найден');
+  return prisma.reservation.update({
+    where: { id: reservationId },
+    data: { confirmedForShipment: confirmed },
+  });
 }
 
 // ── Обновление статуса оплаты (бухгалтер) ────────────────────────────────────

@@ -106,21 +106,39 @@ router.post(
   }),
 );
 
-// Проверка дебиторки (авторазвилка)
-router.post(
-  '/:id/credit-check',
-  requireRole('MANAGER', 'ACCOUNTANT'),
-  asyncHandler(async (req, res) => {
-    res.json(await service.runCreditCheck(req.params.id, req.user!));
-  }),
-);
-
 // Постановка в план производства
 router.post(
   '/:id/to-production',
   requireRole('MANAGER', 'WAREHOUSE', 'FACTORY'),
   asyncHandler(async (req, res) => {
     res.json(await service.addToProductionPlan(req.params.id, req.user!));
+  }),
+);
+
+// Регламент, п. 8: клиент подтвердил готовность ждать производство.
+router.post(
+  '/:id/production-accept',
+  requireRole('MANAGER', 'CLIENT'),
+  asyncHandler(async (req, res) => {
+    res.json(await service.acceptProduction(req.params.id, req.user!));
+  }),
+);
+
+// Регламент, п. 4: снять резерв того же клиента и перенести на эту заявку.
+router.post(
+  '/:id/reservations/:reservationId/release',
+  requireRole('MANAGER', 'WAREHOUSE'),
+  asyncHandler(async (req, res) => {
+    res.json(await service.releaseReservation(req.params.id, req.params.reservationId, req.user!));
+  }),
+);
+
+// Регламент, п. 5: запросить снятие резерва у другого партнёра.
+router.post(
+  '/:id/reservations/:reservationId/request-release',
+  requireRole('MANAGER'),
+  asyncHandler(async (req, res) => {
+    res.json(await service.requestReservationRelease(req.params.id, req.params.reservationId, req.user!));
   }),
 );
 

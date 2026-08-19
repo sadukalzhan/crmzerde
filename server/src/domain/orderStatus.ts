@@ -3,7 +3,6 @@ import type { Role } from './roles';
 
 export const ORDER_STATUSES = [
   'NEW',
-  'CREDIT_CHECK',
   'REJECTED',
   'SPEC_PREPARATION',
   'SIGNING',
@@ -35,7 +34,6 @@ export interface StatusMeta {
 
 export const STATUS_META: Record<OrderStatus, StatusMeta> = {
   NEW:              { key: 'NEW',              label: 'Новая заявка',           color: '#4C8DFF', terminal: false, hint: 'Клиент создал заявку' },
-  CREDIT_CHECK:     { key: 'CREDIT_CHECK',     label: 'Проверка дебиторки',     color: '#22B8CF', terminal: false, hint: 'Проверка долга клиента' },
   REJECTED:         { key: 'REJECTED',         label: 'Отклонено',              color: '#FF5A5F', terminal: true,  hint: 'Заявка отклонена (с причиной)' },
   SPEC_PREPARATION: { key: 'SPEC_PREPARATION', label: 'Согласование',           color: '#7C6CF6', terminal: false, hint: 'Менеджер готовит спецификацию' },
   SIGNING:          { key: 'SIGNING',          label: 'На подписании',          color: '#9B72FF', terminal: false, hint: 'Подписи менеджера и клиента' },
@@ -66,7 +64,7 @@ export function kanbanStatusesForRole(role: Role): OrderStatus[] {
     case 'LOGIST':
       return ['READY', 'SHIPMENT', 'DELIVERY'];
     case 'ACCOUNTANT':
-      return ['CREDIT_CHECK', 'AWAITING_PAYMENT', 'REJECTED', 'POSTPAYMENT', 'DOCS_CONFIRMED'];
+      return ['AWAITING_PAYMENT', 'REJECTED', 'POSTPAYMENT', 'DOCS_CONFIRMED'];
     case 'MANAGER':
     case 'ADMIN':
     default:

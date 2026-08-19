@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
 import type {
   AppSettings,
+  Availability,
   Claim,
   Client,
   Contract,
@@ -75,11 +76,38 @@ export const useTransition = () => {
   });
 };
 
-export const useCreditCheck = () => {
+// Регламент, п. 2-5: проверка свободных остатков и чужих резервов по позициям.
+export const useAvailability = (id?: string) =>
+  useQuery({
+    queryKey: ['availability', id],
+    queryFn: async () => (await api.get(`/orders/${id}/availability`)).data as Availability,
+    enabled: !!id,
+  });
+
+export const useAcceptProduction = () => {
   const invalidate = useOrderInvalidator();
   return useMutation({
-    mutationFn: async (id: string) => (await api.post<Order>(`/orders/${id}/credit-check`)).data,
+    mutationFn: async (id: string) => (await api.post<Order>(`/orders/${id}/production-accept`)).data,
     onSuccess: (_d, id) => invalidate(id),
+  });
+};
+
+export const useReleaseReservation = () => {
+  const qc = useQueryClient();
+  const invalidate = useOrderInvalidator();
+  return useMutation({
+    mutationFn: async (vars: { orderId: string; reservationId: string; request?: boolean }) =>
+      (
+        await api.post(
+          `/orders/${vars.orderId}/reservations/${vars.reservationId}/` +
+            (vars.request ? 'request-release' : 'release'),
+        )
+      ).data,
+    onSuccess: (_d, vars) => {
+      invalidate(vars.orderId);
+      qc.invalidateQueries({ queryKey: ['availability', vars.orderId] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+    },
   });
 };
 
@@ -330,6 +358,3 @@ export const useAnalyticsSummary = () =>
 
 export const useFunnel = () =>
   useQuery({ queryKey: ['analytics', 'funnel'], queryFn: async () => (await api.get('/analytics/funnel')).data });
-
-export const useReceivables = () =>
-  useQuery({ queryKey: ['analytics', 'receivables'], queryFn: async () => (await api.get('/analytics/receivables')).data });

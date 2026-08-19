@@ -5,7 +5,6 @@ import type { OrderStatus } from '../lib/types';
 
 const MAIN_PATH: OrderStatus[] = [
   'NEW',
-  'CREDIT_CHECK',
   'SPEC_PREPARATION',
   'SIGNING',
   'AWAITING_PAYMENT',

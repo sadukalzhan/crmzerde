@@ -71,8 +71,6 @@ router.patch(
       phone: z.string().nullable().optional(),
       bin: z.string().nullable().optional(),
       address: z.string().nullable().optional(),
-      debt: z.number().nonnegative().optional(),
-      creditBlocked: z.boolean().optional(),
       managerId: z.string().nullable().optional(),
     }),
   ),
@@ -90,20 +88,6 @@ router.delete(
     if (count > 0) throw conflict(`У клиента есть заявки (${count}) — сначала удалите их`);
     await prisma.client.delete({ where: { id: req.params.id } });
     res.json({ ok: true });
-  }),
-);
-
-// Разблокировка по долгу (бухгалтер): обнуляем долг и снимаем блок.
-router.post(
-  '/:id/unblock',
-  requireRole('ACCOUNTANT'),
-  asyncHandler(async (req, res) => {
-    res.json(
-      await prisma.client.update({
-        where: { id: req.params.id },
-        data: { debt: 0, creditBlocked: false },
-      }),
-    );
   }),
 );
 

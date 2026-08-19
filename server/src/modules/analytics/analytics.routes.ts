@@ -52,18 +52,4 @@ router.get(
   }),
 );
 
-// Дебиторка.
-router.get(
-  '/receivables',
-  asyncHandler(async (_req, res) => {
-    const clients = await prisma.client.findMany({
-      where: { debt: { gt: 0 } },
-      select: { id: true, companyName: true, debt: true, creditBlocked: true },
-      orderBy: { debt: 'desc' },
-    });
-    const total = clients.reduce((s, c) => s + c.debt, 0);
-    res.json({ total, clients });
-  }),
-);
-
 export default router;

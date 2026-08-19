@@ -6,7 +6,6 @@ import { PageLoader, EmptyState, Modal, Field } from '../components/ui';
 import { useClients, useDeleteClient, useUpdateClient } from '../lib/queries';
 import { api, apiError } from '../lib/api';
 import { toast } from '../components/toast';
-import { fmtMoney } from '../lib/format';
 import { useAuth } from '../lib/store';
 import type { Client } from '../lib/types';
 
@@ -16,15 +15,13 @@ export default function ClientsPage() {
   const { data: clients = [], isLoading } = useClients();
   const deleteClient = useDeleteClient();
   const [createOpen, setCreateOpen] = useState(false);
-  const [edit, setEdit] = useState<Client | null>(null);
   const [fullEdit, setFullEdit] = useState<Client | null>(null);
   const [del, setDel] = useState<Client | null>(null);
 
   if (isLoading) return <PageLoader />;
   const isAdmin = user.role === 'ADMIN';
   const canCreate = user.role === 'MANAGER' || user.role === 'ADMIN';
-  const canEditDebt = user.role === 'ACCOUNTANT' || user.role === 'MANAGER' || user.role === 'ADMIN';
-  const showActions = canEditDebt || isAdmin;
+  const showActions = isAdmin;
 
   return (
     <Page>
@@ -46,7 +43,6 @@ export default function ClientsPage() {
                   <th className="px-4 py-3 font-medium">Контакт</th>
                   <th className="hidden px-4 py-3 font-medium md:table-cell">Телефон</th>
                   <th className="px-4 py-3 font-medium">Заявок</th>
-                  <th className="px-4 py-3 font-medium">Дебиторка</th>
                   {showActions && <th className="px-4 py-3 font-medium" />}
                 </tr>
               </thead>
@@ -55,16 +51,13 @@ export default function ClientsPage() {
                   <tr key={c.id} className="transition hover:bg-panel-2/30">
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-100">{c.companyName}</div>
-                      {c.creditBlocked && <span className="chip mt-1 bg-rose-500/15 text-rose-300">Заблокирован</span>}
                     </td>
                     <td className="px-4 py-3 text-muted">{c.contactName ?? '—'}</td>
                     <td className="hidden px-4 py-3 text-muted md:table-cell">{c.phone ?? '—'}</td>
                     <td className="px-4 py-3 text-muted">{c._count?.orders ?? 0}</td>
-                    <td className={`px-4 py-3 font-medium ${c.debt > 0 ? 'text-rose-300' : 'text-emerald-300'}`}>{fmtMoney(c.debt)}</td>
                     {showActions && (
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
-                          {canEditDebt && <button className="btn-soft px-2.5 py-1 text-xs" onClick={() => setEdit(c)}>Дебиторка</button>}
                           {isAdmin && (
                             <>
                               <button className="rounded-lg p-1.5 text-muted hover:bg-panel-2 hover:text-white" title="Изменить" onClick={() => setFullEdit(c)}><Pencil size={15} /></button>
@@ -83,7 +76,6 @@ export default function ClientsPage() {
       )}
 
       <CreateClientModal open={createOpen} onClose={() => setCreateOpen(false)} onDone={() => { qc.invalidateQueries({ queryKey: ['clients'] }); setCreateOpen(false); }} />
-      <DebtModal key={edit?.id ?? 'none'} client={edit} onClose={() => setEdit(null)} onDone={() => { qc.invalidateQueries({ queryKey: ['clients'] }); setEdit(null); }} />
       {isAdmin && fullEdit && (
         <EditClientModal client={fullEdit} onClose={() => setFullEdit(null)} onDone={() => { qc.invalidateQueries({ queryKey: ['clients'] }); setFullEdit(null); }} />
       )}
@@ -179,33 +171,3 @@ function CreateClientModal({ open, onClose, onDone }: { open: boolean; onClose: 
   );
 }
 
-function DebtModal({ client, onClose, onDone }: { client: Client | null; onClose: () => void; onDone: () => void }) {
-  const [debt, setDebt] = useState(client?.debt ?? 0);
-  const [blocked, setBlocked] = useState(client?.creditBlocked ?? false);
-  const save = async () => {
-    if (!client) return;
-    try {
-      await api.patch(`/clients/${client.id}`, { debt, creditBlocked: blocked });
-      toast.success('Сохранено');
-      onDone();
-    } catch (e) {
-      toast.error(apiError(e));
-    }
-  };
-  return (
-    <Modal
-      open={!!client}
-      onClose={onClose}
-      title={`Дебиторка: ${client?.companyName ?? ''}`}
-      footer={<><button className="btn-ghost" onClick={onClose}>Отмена</button><button className="btn-primary" onClick={save}>Сохранить</button></>}
-    >
-      <div className="space-y-3">
-        <Field label="Сумма долга"><input className="input" type="number" min={0} value={debt} onChange={(e) => setDebt(Number(e.target.value))} /></Field>
-        <label className="flex items-center gap-2 text-sm text-slate-200">
-          <input type="checkbox" checked={blocked} onChange={(e) => setBlocked(e.target.checked)} className="h-4 w-4 accent-[#7C6CF6]" />
-          Заблокировать по задолженности
-        </label>
-      </div>
-    </Modal>
-  );
-}

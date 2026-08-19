@@ -85,7 +85,6 @@ async function main() {
       phone: '+7 707 555 44 33',
       bin: '050340001234',
       address: 'г. Алматы, ул. Райымбека 220',
-      debt: 0,
       managerId: manager.id,
       userId: clientUser.id,
     },

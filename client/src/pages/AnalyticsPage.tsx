@@ -1,8 +1,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { Page, PageHeader } from '../components/PageHeader';
 import { PageLoader, EmptyState } from '../components/ui';
-import { useFunnel, useReceivables, useAnalyticsSummary, useMeta } from '../lib/queries';
-import { fmtMoney } from '../lib/format';
+import { useFunnel, useAnalyticsSummary, useMeta } from '../lib/queries';
 import type { OrderStatus } from '../lib/types';
 
 const PRIORITY_COLORS: Record<string, string> = { HIGH: '#FF5A5F', MEDIUM: '#FFB020', LOW: '#5C6678' };
@@ -11,7 +10,6 @@ const PRIORITY_LABELS: Record<string, string> = { HIGH: 'Высокий', MEDIUM
 export default function AnalyticsPage() {
   const { data: meta } = useMeta();
   const { data: funnel = [], isLoading } = useFunnel();
-  const { data: receivables } = useReceivables();
   const { data: summary } = useAnalyticsSummary();
 
   if (isLoading || !meta || !summary) return <PageLoader />;
@@ -26,7 +24,7 @@ export default function AnalyticsPage() {
 
   return (
     <Page>
-      <PageHeader title="Аналитика" subtitle="Воронка по этапам, приоритеты и дебиторка" />
+      <PageHeader title="Аналитика" subtitle="Воронка по этапам и приоритеты" />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Воронка */}
@@ -75,43 +73,6 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Дебиторка */}
-      <div className="mt-5 card p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white">Дебиторская задолженность</h3>
-          <span className="text-sm font-bold text-rose-300">{fmtMoney(receivables?.total ?? 0)}</span>
-        </div>
-        {!receivables?.clients?.length ? (
-          <EmptyState title="Задолженностей нет" />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs uppercase text-muted-2">
-                  <th className="py-2 pr-4 font-medium">Клиент</th>
-                  <th className="py-2 pr-4 font-medium">Долг</th>
-                  <th className="py-2 font-medium">Статус</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {receivables.clients.map((c: { id: string; companyName: string; debt: number; creditBlocked: boolean }) => (
-                  <tr key={c.id}>
-                    <td className="py-2.5 pr-4 text-slate-200">{c.companyName}</td>
-                    <td className="py-2.5 pr-4 font-medium text-rose-300">{fmtMoney(c.debt)}</td>
-                    <td className="py-2.5">
-                      {c.creditBlocked ? (
-                        <span className="chip bg-rose-500/15 text-rose-300">Заблокирован</span>
-                      ) : (
-                        <span className="chip bg-amber-500/15 text-amber-300">Есть долг</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </Page>
   );
 }

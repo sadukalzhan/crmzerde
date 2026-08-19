@@ -68,8 +68,6 @@ model Client {
   phone        String?
   bin          String? // БИН/ИНН — реквизиты
   address      String?
-  debt         Float    @default(0) // текущая дебиторка (долг)
-  creditBlocked Boolean @default(false) // заблокирован по долгу
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -156,6 +154,11 @@ model Order {
   productionStartDate DateTime? // дата запуска (правило 15-го числа)
   rejectionReason     String?
   closedAt            DateTime?
+
+  // Регламент, п. 8: клиент подтвердил готовность ждать производство
+  // недостающих позиций. Без этой отметки заявку нельзя вести дальше плана.
+  productionAcceptedAt DateTime?
+  productionAcceptedBy String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -328,6 +331,9 @@ model Reservation {
   product     Product  @relation(fields: [productId], references: [id])
   grade       String   @default("A")
   quantity    Float // м²
+  // Резерв подтверждён под конкретную отгрузку — такой нельзя перебросить
+  // на другую заявку того же клиента (Регламент, п. 4).
+  confirmedForShipment Boolean @default(false)
   createdById String?
   createdBy   User?    @relation("ReservationCreator", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())

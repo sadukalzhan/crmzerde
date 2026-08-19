@@ -1,8 +1,11 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
+import { validateBody } from '../../middleware/validate';
 import { asyncHandler } from '../../middleware/error';
+import { setReservationConfirmed } from '../orders/orders.service';
 import { boxes, pallets } from '../../domain/packaging';
 
 const router = Router();
@@ -35,6 +38,17 @@ router.get(
         pallets: pallets(r.quantity, r.product.format, r.grade),
       })),
     );
+  }),
+);
+
+// Регламент, п. 4: отметка «подтверждён под конкретную отгрузку». Такой резерв
+// нельзя перебросить на другую заявку того же клиента.
+router.patch(
+  '/:id/confirm',
+  requireRole('MANAGER', 'WAREHOUSE'),
+  validateBody(z.object({ confirmed: z.boolean() })),
+  asyncHandler(async (req, res) => {
+    res.json(await setReservationConfirmed(req.params.id, req.body.confirmed));
   }),
 );
 

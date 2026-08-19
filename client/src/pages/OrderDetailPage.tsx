@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, ShieldCheck, Upload, Download, PenLine, Plus, Trash2, Wallet,
+  ArrowLeft, Upload, Download, PenLine, Plus, Trash2, Wallet,
   History as HistoryIcon, Building2, AlertTriangle, CheckCircle2, X, Pencil,
 } from 'lucide-react';
 import { Page } from '../components/PageHeader';
@@ -9,7 +9,8 @@ import { PageLoader, EmptyState, Modal, Field } from '../components/ui';
 import { StatusBadge, PriorityDot, RoleBadge, ProductionPriorityBadge } from '../components/badges';
 import { StatusTracker } from '../components/StatusTracker';
 import {
-  useOrder, useMeta, useProducts, useTransition, useCreditCheck, useUpdatePayment,
+  useOrder, useMeta, useProducts, useTransition, useUpdatePayment,
+  useAvailability, useAcceptProduction, useReleaseReservation,
   useUploadDocument, useSignSpec, useCreateSpec, useCreateContract, useSignContract, useUpdateClaim,
   useCreateClaim, useUpdateOrder, useDeleteOrder, useUsers, useFactories, useCarriers,
 } from '../lib/queries';
@@ -18,8 +19,9 @@ import { toast } from '../components/toast';
 import { fmtDate, fmtDateTime, fmtMoney, fmtM2 } from '../lib/format';
 import { boxes, pallets, GRADE_LABELS } from '../lib/packaging';
 import { useAuth } from '../lib/store';
+import { cn } from '../lib/cn';
 import { useQueryClient } from '@tanstack/react-query';
-import type { Order, OrderStatus } from '../lib/types';
+import type { AvailabilityLine, Order, OrderStatus } from '../lib/types';
 
 const DOC_TYPE_OPTIONS = ['TTN', 'UPD', 'ACT', 'INVOICE', 'OTHER'];
 
@@ -35,7 +37,10 @@ export default function OrderDetailPage() {
   const { data: products = [] } = useProducts();
 
   const transition = useTransition();
-  const creditCheck = useCreditCheck();
+  // Регламент, п. 2-5: проверка остатков и резервов доступна только сотрудникам.
+  const { data: availability } = useAvailability(isStaff ? id : undefined);
+  const acceptProduction = useAcceptProduction();
+  const releaseReservation = useReleaseReservation();
   const updatePayment = useUpdatePayment();
   const uploadDoc = useUploadDocument();
   const signSpec = useSignSpec();
@@ -94,16 +99,6 @@ export default function OrderDetailPage() {
       },
     );
     if (fileRef.current) fileRef.current.value = '';
-  };
-
-  const unblockClient = async () => {
-    try {
-      await api.post(`/clients/${order.client.id}/unblock`);
-      toast.success('Клиент разблокирован, долг обнулён');
-      qc.invalidateQueries();
-    } catch (e) {
-      toast.error(apiError(e));
-    }
   };
 
   const addContract = () => {
@@ -195,6 +190,104 @@ export default function OrderDetailPage() {
               </div>
             )}
           </Section>
+
+          {/* Остатки и резервы — Регламент, п. 2-5 */}
+          {isStaff && availability && (
+            <Section
+              title="Остатки и резервы по позициям"
+              action={
+                <span
+                  className={cn(
+                    'chip',
+                    availability.status === 'FULL'
+                      ? 'bg-emerald-500/15 text-emerald-300'
+                      : availability.status === 'PARTIAL'
+                        ? 'bg-amber-500/15 text-amber-300'
+                        : 'bg-rose-500/15 text-rose-300',
+                  )}
+                >
+                  {availability.status === 'FULL'
+                    ? 'Хватает полностью'
+                    : availability.status === 'PARTIAL'
+                      ? 'Частично'
+                      : 'Нет наличия'}
+                </span>
+              }
+            >
+              <div className="space-y-3">
+                {availability.lines.map((line: AvailabilityLine) => (
+                  <div key={`${line.productId}-${line.grade}`} className="rounded-lg border border-border p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-medium text-slate-100">{line.name}</div>
+                        <div className="text-xs text-muted">{GRADE_LABELS[line.grade] ?? line.grade}</div>
+                      </div>
+                      <div className="flex gap-4 text-xs">
+                        <span className="text-muted">Нужно: <b className="text-slate-200">{fmtM2(line.needed)}</b></span>
+                        <span className="text-muted">Свободно: <b className="text-slate-200">{fmtM2(line.free)}</b></span>
+                        {line.shortage > 0 && (
+                          <span className="text-rose-300">Нехватка: <b>{fmtM2(line.shortage)}</b></span>
+                        )}
+                      </div>
+                    </div>
+
+                    {line.reservedBy.length > 0 && (
+                      <div className="mt-3 space-y-2 border-t border-border pt-3">
+                        <div className="text-xs uppercase text-muted-2">В резерве у других заявок</div>
+                        {line.reservedBy.map((h) => (
+                          <div key={h.reservationId} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <div className="text-muted">
+                              <b className="text-slate-200">{fmtM2(h.quantity)}</b> · заявка #{h.orderNumber} · {h.clientName}
+                              {h.managerName && ` · ${h.managerName}`}
+                              {h.confirmedForShipment && (
+                                <span className="chip ml-2 bg-sky-500/15 text-sky-300">Подтверждён под отгрузку</span>
+                              )}
+                              {h.sameClient && !h.confirmedForShipment && (
+                                <span className="chip ml-2 bg-emerald-500/15 text-emerald-300">Тот же клиент</span>
+                              )}
+                            </div>
+                            {(user.role === 'MANAGER' || user.role === 'ADMIN' || user.role === 'WAREHOUSE') && (
+                              h.releasable ? (
+                                <button
+                                  className="btn-soft px-2.5 py-1 text-xs"
+                                  onClick={() =>
+                                    releaseReservation.mutate(
+                                      { orderId: order.id, reservationId: h.reservationId },
+                                      {
+                                        onSuccess: () => toast.success('Резерв снят и перенесён на эту заявку'),
+                                        onError: (e) => toast.error(apiError(e)),
+                                      },
+                                    )
+                                  }
+                                >
+                                  Забрать на эту заявку
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn-ghost px-2.5 py-1 text-xs"
+                                  onClick={() =>
+                                    releaseReservation.mutate(
+                                      { orderId: order.id, reservationId: h.reservationId, request: true },
+                                      {
+                                        onSuccess: () => toast.success('Запрос на снятие резерва отправлен'),
+                                        onError: (e) => toast.error(apiError(e)),
+                                      },
+                                    )
+                                  }
+                                >
+                                  Запросить снятие
+                                </button>
+                              )
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
 
           {/* Спецификации */}
           <Section
@@ -354,13 +447,24 @@ export default function OrderDetailPage() {
           {/* Действия */}
           <Section title="Действия">
             <div className="space-y-2">
-              {order.status === 'CREDIT_CHECK' && (user.role === 'MANAGER' || user.role === 'ACCOUNTANT' || user.role === 'ADMIN') && (
+              {/* Регламент, п. 8: фиксация ответа клиента о готовности ждать производство */}
+              {!order.productionAcceptedAt && (user.role === 'MANAGER' || user.role === 'ADMIN') && (
                 <button
-                  onClick={() => creditCheck.mutate(order.id, { onSuccess: () => toast.success('Дебиторка проверена'), onError: (e) => toast.error(apiError(e)) })}
-                  className="btn-primary w-full"
+                  onClick={() =>
+                    acceptProduction.mutate(order.id, {
+                      onSuccess: () => toast.success('Согласие клиента зафиксировано'),
+                      onError: (e) => toast.error(apiError(e)),
+                    })
+                  }
+                  className="btn-soft w-full"
                 >
-                  <ShieldCheck size={16} /> Проверить дебиторку
+                  <CheckCircle2 size={16} /> Клиент готов ждать производство
                 </button>
+              )}
+              {order.productionAcceptedAt && (
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+                  <CheckCircle2 size={14} /> Клиент подтвердил ожидание производства {fmtDate(order.productionAcceptedAt)}
+                </div>
               )}
               {allowed.length === 0 ? (
                 <p className="text-sm text-muted-2">Нет доступных переходов для вашей роли на этом этапе.</p>
@@ -425,18 +529,7 @@ export default function OrderDetailPage() {
                 <Info label="Компания" value={order.client.companyName} />
                 <Info label="Контакт" value={order.client.contactName ?? '—'} />
                 <Info label="Телефон" value={order.client.phone ?? '—'} />
-                <Info label="Дебиторка" value={fmtMoney(order.client.debt)} />
               </dl>
-              {order.client.creditBlocked && (
-                <div className="mt-3">
-                  <div className="mb-2 flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
-                    <AlertTriangle size={14} /> Клиент заблокирован по долгу
-                  </div>
-                  {(user.role === 'ACCOUNTANT' || user.role === 'ADMIN') && (
-                    <button onClick={unblockClient} className="btn-soft w-full text-xs">Разблокировать (обнулить долг)</button>
-                  )}
-                </div>
-              )}
             </Section>
           )}
         </div>

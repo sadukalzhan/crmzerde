@@ -2,7 +2,6 @@ export type Role = 'ADMIN' | 'MANAGER' | 'FACTORY' | 'WAREHOUSE' | 'LOGIST' | 'A
 
 export type OrderStatus =
   | 'NEW'
-  | 'CREDIT_CHECK'
   | 'REJECTED'
   | 'SPEC_PREPARATION'
   | 'SIGNING'
@@ -17,6 +16,35 @@ export type OrderStatus =
   | 'CLAIM'
   | 'POSTPAYMENT'
   | 'CLOSED';
+
+export interface ReservationHolder {
+  reservationId: string;
+  quantity: number;
+  orderId: string;
+  orderNumber: number;
+  clientName: string;
+  managerName: string | null;
+  sameClient: boolean;
+  confirmedForShipment: boolean;
+  /** Резерв своего клиента без подтверждения под отгрузку — можно забрать сразу. */
+  releasable: boolean;
+}
+
+export interface AvailabilityLine {
+  productId: string;
+  grade: Grade;
+  name: string;
+  needed: number;
+  free: number;
+  covered: number;
+  shortage: number;
+  reservedBy: ReservationHolder[];
+}
+
+export interface Availability {
+  status: 'FULL' | 'PARTIAL' | 'NONE';
+  lines: AvailabilityLine[];
+}
 
 export type Priority = 'HIGH' | 'MEDIUM' | 'LOW';
 export type PaymentTerm = 'PREPAYMENT' | 'POSTPAYMENT';
@@ -44,8 +72,6 @@ export interface Client {
   phone?: string | null;
   bin?: string | null;
   address?: string | null;
-  debt: number;
-  creditBlocked: boolean;
   managerId?: string | null;
   manager?: { id: string; fullName: string } | null;
   _count?: { orders: number };
@@ -154,6 +180,8 @@ export interface Order {
   route?: string | null;
   desiredDate?: string | null;
   productionStartDate?: string | null;
+  /** Регламент, п. 8: когда клиент подтвердил готовность ждать производство. */
+  productionAcceptedAt?: string | null;
   rejectionReason?: string | null;
   closedAt?: string | null;
   createdAt: string;
@@ -168,7 +196,7 @@ export interface Order {
   documents?: DocumentItem[];
   history?: OrderHistoryEntry[];
   claims?: Claim[];
-  reservations?: { id: string; quantity: number; product?: Product }[];
+  reservations?: { id: string; quantity: number; grade?: Grade; confirmedForShipment?: boolean; product?: Product }[];
   productionPlanItems?: { id: string; priority: number; status: string; plan?: { year: number; month: number } }[];
 }
 

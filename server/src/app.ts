@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { env } from './lib/env';
 import { errorHandler } from './middleware/error';
+import { prisma } from './lib/prisma';
 
 import authRoutes from './modules/auth/auth.routes';
 import usersRoutes from './modules/users/users.routes';
@@ -32,7 +33,21 @@ export function createApp() {
   app.use(express.json({ limit: '2mb' }));
   app.use(cookieParser());
 
-  app.get('/api/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
+  // Healthcheck. Всегда 200 (иначе Render сочтёт сервис нездоровым и перезапустит его),
+  // но поле db показывает, доступна ли база — без этого падение БД снаружи не отличить
+  // от рабочего состояния.
+  app.get('/api/health', async (_req, res) => {
+    let db: 'up' | 'down' = 'up';
+    let dbError: string | undefined;
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch (err) {
+      db = 'down';
+      dbError = (err as { code?: string })?.code ?? (err as Error)?.name;
+      console.error('[HEALTH] База недоступна:', err);
+    }
+    res.json({ ok: true, db, ...(dbError ? { dbError } : {}), ts: Date.now() });
+  });
 
   app.use('/api/auth', authRoutes);
   app.use('/api/meta', metaRoutes);

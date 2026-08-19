@@ -57,7 +57,7 @@ export default function OrderFormPage() {
         factoryId: factoryId || undefined,
         carrierId: selfPickup ? undefined : carrierId || undefined,
         selfPickup,
-        priority,
+        priority: isClient ? undefined : priority,
         paymentTerm,
         shipFrom: factoryCity,
         shipTo: shipTo || undefined,
@@ -191,13 +191,16 @@ export default function OrderFormPage() {
                   <option value="POSTPAYMENT">Постоплата</option>
                 </select>
               </Field>
-              <Field label="Приоритет">
-                <select className="input" value={priority} onChange={(e) => setPriority(e.target.value)}>
-                  <option value="HIGH">Высокий</option>
-                  <option value="MEDIUM">Средний</option>
-                  <option value="LOW">Низкий</option>
-                </select>
-              </Field>
+              {/* Приоритет ставит только менеджер — клиенту поле не показываем. */}
+              {!isClient && (
+                <Field label="Приоритет">
+                  <select className="input" value={priority} onChange={(e) => setPriority(e.target.value)}>
+                    <option value="HIGH">Высокий</option>
+                    <option value="MEDIUM">Средний</option>
+                    <option value="LOW">Низкий</option>
+                  </select>
+                </Field>
+              )}
             </div>
             <button className="btn-primary mt-5 w-full" disabled={createOrder.isPending}>
               {createOrder.isPending ? 'Создание…' : 'Создать заявку'}

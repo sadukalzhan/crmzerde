@@ -10,7 +10,7 @@ export function kanbanStatusesForRole(role: Role, all: OrderStatus[]): OrderStat
     case 'LOGIST':
       return ['READY', 'SHIPMENT', 'DELIVERY'];
     case 'ACCOUNTANT':
-      return ['CREDIT_CHECK', 'AWAITING_PAYMENT', 'REJECTED', 'POSTPAYMENT', 'DOCS_CONFIRMED'];
+      return ['AWAITING_PAYMENT', 'REJECTED', 'POSTPAYMENT', 'DOCS_CONFIRMED'];
     default:
       return all;
   }

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, Upload, FileSpreadsheet } from 'lucide-react';
 import { Page, PageHeader } from '../../components/PageHeader';
 import { PageLoader, EmptyState, Modal, Field } from '../../components/ui';
 import { useFactories, useCarriers, useProducts } from '../../lib/queries';
@@ -16,6 +16,44 @@ export default function RefsPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('factories');
   const [open, setOpen] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Импорт активной вкладки из Excel — по образцу импорта остатков склада.
+  const onImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await api.post(`/refs/${tab}/import`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success(
+        `Импорт: добавлено ${data.created}, обновлено ${data.updated}` +
+          (data.skipped ? `, пропущено ${data.skipped}` : ''),
+      );
+      if (data.errors?.length) toast.info(data.errors[0]);
+      qc.invalidateQueries({ queryKey: [tab] });
+      if (tab === 'products') qc.invalidateQueries({ queryKey: ['inventory'] });
+    } catch (err) {
+      toast.error(apiError(err));
+    }
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const downloadTemplate = async () => {
+    try {
+      const res = await api.get(`/refs/${tab}/template`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${tab}-shablon.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
 
   const { data: factories = [], isLoading: l1 } = useFactories();
   const { data: carriers = [], isLoading: l2 } = useCarriers();
@@ -34,8 +72,19 @@ export default function RefsPage() {
     <Page>
       <PageHeader
         title="Справочники"
-        subtitle="Заводы, перевозчики и номенклатура"
-        actions={<button className="btn-primary" onClick={() => setOpen(true)}><Plus size={16} /> Добавить</button>}
+        subtitle="Заводы, перевозчики и номенклатура. Импорт из Excel — в активную вкладку"
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={onImport} />
+            <button onClick={downloadTemplate} className="btn-soft">
+              <FileSpreadsheet size={16} /> Шаблон
+            </button>
+            <button onClick={() => fileRef.current?.click()} className="btn-soft">
+              <Upload size={16} /> Импорт из Excel
+            </button>
+            <button className="btn-primary" onClick={() => setOpen(true)}><Plus size={16} /> Добавить</button>
+          </div>
+        }
       />
 
       <div className="mb-4 flex gap-1 rounded-lg border border-border bg-panel p-1">

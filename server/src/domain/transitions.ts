@@ -12,13 +12,16 @@ const T = (to: OrderStatus, roles: Role[]): Transition => ({ to, roles });
 
 // Из какого статуса в какие можно перейти и кто имеет право.
 export const TRANSITIONS: Record<OrderStatus, Transition[]> = {
-  NEW: [T('CREDIT_CHECK', ['MANAGER', 'ACCOUNTANT'])],
-  CREDIT_CHECK: [
+  // Регламент, п. 1-2: заявка принята → менеджер сразу проверяет остатки и резервы.
+  NEW: [
     T('SPEC_PREPARATION', ['MANAGER']),
-    T('REJECTED', ['MANAGER', 'ACCOUNTANT']),
+    T('REJECTED', ['MANAGER']),
   ],
-  REJECTED: [T('CREDIT_CHECK', ['ACCOUNTANT'])], // разблокировка по долгу
-  SPEC_PREPARATION: [T('SIGNING', ['MANAGER'])],
+  REJECTED: [T('SPEC_PREPARATION', ['MANAGER'])], // возврат в работу
+  SPEC_PREPARATION: [
+    T('SIGNING', ['MANAGER']),
+    T('REJECTED', ['MANAGER']),
+  ],
   SIGNING: [
     T('AWAITING_PAYMENT', ['MANAGER']), // аванс
     T('DOCS_CONFIRMED', ['MANAGER']), // постоплата одобрена

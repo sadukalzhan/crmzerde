@@ -21,18 +21,17 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-bg-elevated">
       {/* Бренд */}
-      <div className="px-5 pb-4 pt-6">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-accent/40 bg-accent-soft">
-            <Grid2x2 size={16} className="text-accent" />
+      <div className="px-3 pb-3 pt-4">
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-panel px-3 py-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gold shadow-glow">
+            <Grid2x2 size={17} className="text-white" />
           </div>
-          <div className="truncate text-[15px] font-semibold tracking-tight text-slate-100">
-            {settings?.brandName ?? 'Зерде Керамика Актобе'}
+          <div className="min-w-0 leading-tight">
+            <div className="truncate text-sm font-semibold text-white">
+              {settings?.brandName ?? 'Зерде Керамика Актобе'}
+            </div>
+            <div className="truncate text-[11px] text-muted-2">Керамогранит</div>
           </div>
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          <span className="h-px flex-1 bg-gradient-to-r from-accent/50 to-transparent" />
-          <span className="text-[10px] uppercase tracking-[0.22em] text-muted-2">CRM платформа</span>
         </div>
       </div>
 
@@ -55,18 +54,24 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                       cn(
                         'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition',
                         isActive
-                          ? 'bg-accent-soft text-accent'
+                          ? 'bg-gold text-white shadow-[0_6px_18px_rgba(192,97,245,0.28)]'
                           : 'text-muted hover:bg-panel-2 hover:text-slate-100',
                       )
                     }
                   >
                     {({ isActive }) => (
                       <>
-                        {isActive && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-accent" />}
-                        <Icon size={17} className={cn(isActive ? 'text-accent' : 'text-muted-2 group-hover:text-slate-300')} />
+                        <Icon size={17} className={cn(isActive ? 'text-white' : 'text-muted-2 group-hover:text-slate-300')} />
                         <span className="flex-1">{t(item.labelKey)}</span>
                         {item.newBadge && newCount > 0 && (
-                          <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-bold text-black">{newCount}</span>
+                          <span
+                            className={cn(
+                              'rounded-md px-1.5 py-0.5 text-[10px] font-bold',
+                              isActive ? 'bg-white/20 text-white' : 'bg-accent-soft text-accent',
+                            )}
+                          >
+                            {newCount}
+                          </span>
                         )}
                       </>
                     )}

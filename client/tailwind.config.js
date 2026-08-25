@@ -4,35 +4,43 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Nocturn: тёплая почти-чёрная база с золотым акцентом
-        bg: '#0A0908',
-        'bg-elevated': '#0F0D0B',
-        panel: '#15120F',
-        'panel-2': '#1E1A15',
-        card: '#131110',
-        border: '#2A2419',
-        'border-light': '#3B3325',
-        muted: '#9A9184',
-        'muted-2': '#6A6357',
-        // Акцент — золото
+        // Propex: глубокий фиолетово-баклажановый фон, пурпурный акцент,
+        // бирюза для положительной динамики.
+        bg: '#0B0713',
+        'bg-elevated': '#120C1F',
+        panel: '#181129',
+        'panel-2': '#221838',
+        card: '#151024',
+        border: '#2C2142',
+        'border-light': '#3D2E5A',
+        muted: '#9A8FB5',
+        'muted-2': '#6B6188',
+        // Акцент — пурпур с уходом в фуксию
         accent: {
-          DEFAULT: '#D6B25E',
-          hover: '#E7C97E',
-          soft: 'rgba(214, 178, 94, 0.12)',
+          DEFAULT: '#A855F7',
+          hover: '#B96BFF',
+          soft: 'rgba(168, 85, 247, 0.14)',
+        },
+        // Вторичный акцент — бирюза (рост, положительная динамика)
+        mint: {
+          DEFAULT: '#2DD4BF',
+          soft: 'rgba(45, 212, 191, 0.14)',
         },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       boxShadow: {
-        card: '0 1px 2px rgba(0,0,0,0.5), 0 6px 22px rgba(0,0,0,0.4)',
-        glow: '0 0 0 1px rgba(214,178,94,0.35), 0 6px 24px rgba(214,178,94,0.14)',
+        card: '0 1px 2px rgba(0,0,0,0.45), 0 8px 26px rgba(0,0,0,0.38)',
+        glow: '0 0 0 1px rgba(168,85,247,0.35), 0 8px 28px rgba(168,85,247,0.22)',
       },
       backgroundImage: {
         // Тёплое свечение вверху страницы, как в макете
+        // Подсветка сцены: пурпур сверху-слева, малиновый справа
         'nocturn-glow':
-          'radial-gradient(1100px 380px at 18% -12%, rgba(214,178,94,0.16), transparent 62%)',
-        'gold': 'linear-gradient(135deg, #E7C97E 0%, #C9A227 100%)',
+          'radial-gradient(900px 420px at 12% -10%, rgba(168,85,247,0.20), transparent 60%), radial-gradient(720px 360px at 88% 4%, rgba(236,72,153,0.14), transparent 62%)',
+        // Градиент кнопок и активного пункта меню
+        'gold': 'linear-gradient(135deg, #C061F5 0%, #EC4899 100%)',
       },
       borderRadius: {
         xl: '14px',

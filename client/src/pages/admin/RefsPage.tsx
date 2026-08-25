@@ -118,7 +118,6 @@ export default function RefsPage() {
                     {p.color && ` · ${p.color}`}
                   </div>
                 </div>
-                <span className="text-sm font-medium text-slate-200">{fmtMoney(p.pricePerUnit)}/м²</span>
               </li>
             ))}
           </ul>
@@ -145,7 +144,6 @@ function AddModal({ tab, open, onClose, onDone }: { tab: Tab; open: boolean; onC
           format: form.format || '60x60',
           collection: form.collection || undefined,
           color: form.color || undefined,
-          pricePerUnit: Number(form.price || 0),
         });
         onDone('products');
       }
@@ -180,7 +178,6 @@ function AddModal({ tab, open, onClose, onDone }: { tab: Tab; open: boolean; onC
             <div className="grid grid-cols-2 gap-3">
               <Field label="Цвет"><input className="input" value={form.color ?? ''} onChange={set('color')} /></Field>
             </div>
-            <Field label="Цена за м²"><input className="input" type="number" value={form.price ?? ''} onChange={set('price')} /></Field>
           </>
         )}
       </div>

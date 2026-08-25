@@ -62,7 +62,7 @@ export interface CreateOrderInput {
   shipFrom?: string;
   shipTo?: string;
   desiredDate?: string;
-  items: { productId: string; quantity: number; grade?: string; pricePerUnit?: number }[];
+  items: { productId: string; quantity: number; grade?: string }[];
 }
 
 export async function createOrder(input: CreateOrderInput, actor: AuthUser) {
@@ -110,7 +110,6 @@ export async function createOrder(input: CreateOrderInput, actor: AuthUser) {
           quantity: i.quantity,
           unit: 'M2',
           grade: i.grade ?? 'A',
-          pricePerUnit: i.pricePerUnit ?? 0,
         })),
       },
     },
@@ -373,14 +372,6 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
   const data: Prisma.OrderUpdateInput = { status: to };
   let note = input.note;
 
-  // Нельзя пропустить производство, если под заявку не хватает доступного остатка.
-  if (from === 'RESERVATION' && (to === 'READY' || to === 'SHIPMENT')) {
-    const shorts = await orderShortages(orderId);
-    const totalShort = shorts.reduce((s, x) => s + x.shortage, 0);
-    if (totalShort > 0) {
-      throw new ApiError(409, 'Недостаточно доступного остатка под заявку — сначала переведите в производство.');
-    }
-  }
 
   // ── Побочные эффекты и guard'ы по целевому статусу ──
   switch (to) {
@@ -390,124 +381,69 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
       note = `Отклонено: ${input.reason}`;
       break;
     }
-    case 'AWAITING_PAYMENT': {
-      if (order.paymentTerm !== 'PREPAYMENT') {
-        throw badRequest('«Ждём оплату» применимо только для условия «Аванс»');
-      }
-      break;
-    }
     case 'RESERVATION': {
       const avail = await availabilityFor(orderId);
       await reserveOutstanding(orderId, actor);
       note = note ?? `Резерв: ${avail.status === 'FULL' ? 'полный' : avail.status === 'PARTIAL' ? 'частичный' : 'нет наличия'}`;
       break;
     }
-    case 'PRODUCTION': {
-      // Регламент, п. 8: в производство — только после того, как клиент
-      // подтвердил готовность ждать недостающие позиции.
-      if (!order.productionAcceptedAt) {
+    case 'SHIPMENT': {
+      // Согласование закрыто двумя условиями.
+      // 1) Двусторонняя спецификация: подписи менеджера и клиента.
+      const signedSpec = await prisma.specification.findFirst({
+        where: { orderId, managerSigned: true, clientSigned: true },
+      });
+      if (!signedSpec) {
         throw new ApiError(
           409,
-          'Клиент ещё не подтвердил готовность ждать производство — зафиксируйте его ответ на заявке.',
+          'Нет двусторонней спецификации — нужны подписи менеджера и клиента.',
         );
       }
-      await addToProductionPlan(orderId, actor);
-      break;
-    }
-    case 'READY': {
-      // Регламент, п. 9: после оприходования продукции складом товар сразу
-      // ставится в резерв под клиента, а не ждёт отдельного действия.
-      const reserved = await reserveOutstanding(orderId, actor);
-      if (reserved > 0) {
-        note = note ?? `Оприходовано и зарезервировано под клиента: ${reserved} м²`;
-      }
-      break;
-    }
-    case 'SHIPMENT': {
-      // Менеджер закрепляет ТТН и УПД — проверяем наличие документов.
-      const docs = await prisma.document.findMany({ where: { orderId, type: { in: ['TTN', 'UPD'] } } });
-      const hasTTN = docs.some((d) => d.type === 'TTN');
-      const hasUPD = docs.some((d) => d.type === 'UPD');
-      if (!hasTTN || !hasUPD) {
-        throw badRequest('Для отгрузки нужно прикрепить ТТН и УПД');
+      // 2) При авансе отгрузка возможна только после поступления оплаты.
+      if (order.paymentTerm === 'PREPAYMENT' && order.paymentStatus !== 'PAID') {
+        throw new ApiError(
+          409,
+          'Условие «Аванс»: отгрузка возможна только после получения оплаты.',
+        );
       }
       // Отгрузка: снимаем резерв и списываем остаток.
       await consumeStockOnShipment(orderId);
       break;
     }
-    case 'POSTPAYMENT': {
-      if (order.paymentTerm !== 'POSTPAYMENT') {
-        throw badRequest('Этап «Постоплата» только для условия «Постоплата»');
-      }
-      break;
-    }
     case 'CLOSED': {
+      // На отгрузке менеджер прикладывает документы — без них заявку не закрыть.
+      const docs = await prisma.document.findMany({ where: { orderId } });
+      if (docs.length === 0) {
+        throw badRequest('Загрузите отгрузочные документы перед завершением заявки');
+      }
       const openClaim = await prisma.claim.findFirst({
         where: { orderId, status: { in: ['OPEN', 'IN_REVIEW'] } },
       });
-      if (openClaim) throw badRequest('Есть открытая рекламация — закрыть сделку нельзя');
+      if (openClaim) throw badRequest('Есть открытая рекламация — закрыть заявку нельзя');
       data.closedAt = new Date();
       data.closedBy = { connect: { id: actor.id } };
       break;
     }
   }
 
-  // Производственный план: при переходе PRODUCTION → READY помечаем готовым.
-  if (from === 'PRODUCTION' && to === 'READY') {
-    await prisma.productionPlanItem.updateMany({
-      where: { orderId },
-      data: { status: 'TRANSFERRED' },
-    });
-  }
-
   await prisma.order.update({ where: { id: orderId }, data });
   await recordHistory(orderId, from, to, actor.id, note);
   const updated = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: orderDetailInclude });
 
-  // Уведомить клиента о смене статуса его заявки. Регламент, п. 9: о поступлении
-  // товара на склад партнёр должен узнавать сразу и без напоминаний с его стороны,
-  // поэтому статус READY описывается отдельным текстом, а не кодом статуса.
+  // Уведомить клиента о смене статуса его заявки — человекочитаемым текстом,
+  // а не кодом статуса.
   if (order.client.userId) {
     await notify({
       userId: order.client.userId,
       type: 'STATUS_CHANGE',
-      title:
-        to === 'READY'
-          ? `Заявка #${order.number}: товар на складе`
-          : `Заявка #${order.number}: ${STATUS_META[to].label}`,
-      body:
-        to === 'READY'
-          ? 'Продукция поступила на склад, зарезервирована под вас и готова к отгрузке.'
-          : STATUS_META[to].hint,
+      title: `Заявка #${order.number}: ${STATUS_META[to].label}`,
+      body: STATUS_META[to].hint,
       orderId,
     });
   }
   emitBoardChanged({ reason: 'transition', orderId, from, to });
 
   return updated;
-}
-
-// ── Регламент, п. 8: фиксация ответа клиента о готовности ждать производство ──
-
-export async function acceptProduction(orderId: string, actor: AuthUser) {
-  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { client: true } });
-  if (!order) throw notFound('Заявка не найдена');
-
-  // Клиент может подтвердить только свою заявку.
-  if (actor.role === 'CLIENT') {
-    const profile = await prisma.client.findUnique({ where: { userId: actor.id } });
-    if (!profile || profile.id !== order.clientId) throw forbidden();
-  }
-
-  if (order.productionAcceptedAt) return getOrder(orderId, actor);
-
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { productionAcceptedAt: new Date(), productionAcceptedBy: actor.id },
-  });
-  await recordHistory(orderId, order.status, order.status, actor.id, 'Клиент подтвердил готовность ждать производство');
-  emitBoardChanged({ reason: 'production-accepted', orderId });
-  return getOrder(orderId, actor);
 }
 
 // ── Регламент, п. 4-5: работа с чужими резервами ─────────────────────────────

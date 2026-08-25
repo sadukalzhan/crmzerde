@@ -12,41 +12,23 @@ const T = (to: OrderStatus, roles: Role[]): Transition => ({ to, roles });
 
 // Из какого статуса в какие можно перейти и кто имеет право.
 export const TRANSITIONS: Record<OrderStatus, Transition[]> = {
-  // Регламент, п. 1-2: заявка принята → менеджер сразу проверяет остатки и резервы.
+  // Заявка принята: только продукция и количество.
   NEW: [
+    T('RESERVATION', ['MANAGER', 'SALES_HEAD', 'WAREHOUSE']),
+    T('REJECTED', ['MANAGER', 'SALES_HEAD']),
+  ],
+  REJECTED: [T('NEW', ['MANAGER', 'SALES_HEAD'])], // возврат в работу
+  // Резерв под заявку. Дальше — согласование условий и цен.
+  RESERVATION: [
     T('SPEC_PREPARATION', ['MANAGER', 'SALES_HEAD']),
     T('REJECTED', ['MANAGER', 'SALES_HEAD']),
   ],
-  REJECTED: [T('SPEC_PREPARATION', ['MANAGER'])], // возврат в работу
-  SPEC_PREPARATION: [
-    T('SIGNING', ['MANAGER', 'SALES_HEAD']),
-    T('REJECTED', ['MANAGER', 'SALES_HEAD']),
-  ],
-  SIGNING: [
-    T('AWAITING_PAYMENT', ['MANAGER', 'SALES_HEAD']), // аванс
-    T('DOCS_CONFIRMED', ['MANAGER', 'SALES_HEAD']), // постоплата одобрена
-  ],
-  AWAITING_PAYMENT: [T('DOCS_CONFIRMED', ['MANAGER', 'SALES_HEAD'])],
-  DOCS_CONFIRMED: [T('RESERVATION', ['WAREHOUSE', 'MANAGER', 'SALES_HEAD'])],
-  RESERVATION: [
-    T('READY', ['WAREHOUSE']), // полное наличие
-    T('PRODUCTION', ['WAREHOUSE', 'MANAGER', 'SALES_HEAD']), // нет / частично → производство
-    T('SHIPMENT', ['WAREHOUSE', 'MANAGER', 'SALES_HEAD']), // зарезервировано полностью
-  ],
-  PRODUCTION: [T('READY', ['WAREHOUSE', 'MANAGER', 'SALES_HEAD'])],
-  READY: [T('SHIPMENT', ['WAREHOUSE', 'MANAGER', 'SALES_HEAD'])],
-  SHIPMENT: [T('DELIVERY', ['MANAGER', 'SALES_HEAD'])],
-  DELIVERY: [T('AWAITING_DOCS', ['MANAGER', 'SALES_HEAD'])],
-  AWAITING_DOCS: [
-    T('CLAIM', ['MANAGER', 'SALES_HEAD', 'CLIENT']),
-    T('POSTPAYMENT', ['MANAGER', 'SALES_HEAD']),
-    T('CLOSED', ['MANAGER', 'SALES_HEAD']),
-  ],
-  CLAIM: [
-    T('AWAITING_DOCS', ['MANAGER', 'SALES_HEAD']), // возврат в цикл после разбора
-    T('CLOSED', ['MANAGER', 'SALES_HEAD']),
-  ],
-  POSTPAYMENT: [T('CLOSED', ['MANAGER', 'SALES_HEAD'])],
+  // Согласование: менеджер указывает условие оплаты и цены в спецификации.
+  // Переход к отгрузке закрыт, пока нет двусторонней спецификации, а при
+  // авансе — ещё и пока не получена оплата (проверки в orders.service).
+  SPEC_PREPARATION: [T('SHIPMENT', ['MANAGER', 'SALES_HEAD', 'WAREHOUSE'])],
+  // Отгрузка: менеджер прикладывает документы, затем закрывает заявку.
+  SHIPMENT: [T('CLOSED', ['MANAGER', 'SALES_HEAD'])],
   CLOSED: [],
 };
 

@@ -67,7 +67,6 @@ const TEMPLATE_COLUMNS: Record<RefKind, { header: string; width: number }[]> = {
     { header: 'Формат', width: 12 },
     { header: 'Коллекция', width: 18 },
     { header: 'Цвет', width: 14 },
-    { header: 'Цена за м²', width: 14 },
   ],
   carriers: [
     { header: 'Название', width: 28 },
@@ -128,7 +127,6 @@ router.post(
         const formatCol = findCol('формат', 'format');
         const collectionCol = findCol('коллекц', 'collection');
         const colorCol = findCol('цвет', 'color');
-        const priceCol = findCol('цена', 'price');
 
         for (let r = 2; r <= ws.rowCount; r++) {
           const row = ws.getRow(r);
@@ -137,12 +135,10 @@ router.post(
 
           const rawFormat = cellText(row, formatCol).replace(/[х×*]/gi, 'x').replace(/\s/g, '');
           const format = isFormat(rawFormat) ? rawFormat : '60x60';
-          const price = Number(row.getCell(priceCol ?? 0).value ?? 0);
           const data = {
             format,
             collection: cellText(row, collectionCol) || null,
             color: cellText(row, colorCol) || null,
-            pricePerUnit: Number.isFinite(price) ? price : 0,
           };
 
           const existing = await prisma.product.findFirst({ where: { name } });

@@ -89,16 +89,15 @@ model Client {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Product {
-  id           String   @id @default(cuid())
-  name         String // «Cemento Ivory Carving»
-  format       String   @default("60x60") // 60x60 | 120x60
-  size         String? // legacy / произвольный размер
-  collection   String? // «Cemento»
-  color        String? // цвет
-  unit         String   @default("M2") // базовая единица — м²
-  pricePerUnit Float    @default(0) // цена за м²
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  id         String   @id @default(cuid())
+  name       String // «Cemento Ivory Carving»
+  format     String   @default("60x60") // 60x60 | 120x60
+  size       String? // legacy / произвольный размер
+  collection String? // «Cemento»
+  color      String? // цвет
+  unit       String   @default("M2") // базовая единица — м²
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
 
   inventory          Inventory[]
   orderItems         OrderItem[]
@@ -146,11 +145,6 @@ model Order {
   rejectionReason     String?
   closedAt            DateTime?
 
-  // Регламент, п. 8: клиент подтвердил готовность ждать производство
-  // недостающих позиций. Без этой отметки заявку нельзя вести дальше плана.
-  productionAcceptedAt DateTime?
-  productionAcceptedBy String?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -183,15 +177,14 @@ model Order {
 }
 
 model OrderItem {
-  id           String  @id @default(cuid())
-  orderId      String
-  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId    String
-  product      Product @relation(fields: [productId], references: [id])
-  quantity     Float // м²
-  unit         String  @default("M2")
-  grade        String  @default("A") // A | B | C | BRAK
-  pricePerUnit Float   @default(0)
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Float // м²
+  unit      String  @default("M2")
+  grade     String  @default("A") // A | B | C | BRAK
 
   productionPlanItems ProductionPlanItem[]
 }

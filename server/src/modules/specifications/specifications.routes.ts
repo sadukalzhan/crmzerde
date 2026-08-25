@@ -43,7 +43,7 @@ router.get(
 
 router.post(
   '/',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'SALES_HEAD'),
   validateBody(
     z.object({
       orderId: z.string(),
@@ -55,17 +55,20 @@ router.post(
             productId: z.string().optional(),
             name: z.string(),
             quantity: z.number().positive(),
-            unit: z.enum(['PALLET', 'M2']).default('PALLET'),
+            unit: z.enum(['PALLET', 'M2']).default('M2'),
             price: z.number().nonnegative(),
+            // Сумму менеджер может проставить вручную (скидка, округление);
+            // если не передана — считаем как количество × цена.
+            sum: z.number().nonnegative().optional(),
           }),
         )
         .min(1),
     }),
   ),
   asyncHandler(async (req, res) => {
-    const items = req.body.items.map((i: { quantity: number; price: number }) => ({
+    const items = req.body.items.map((i: { quantity: number; price: number; sum?: number }) => ({
       ...i,
-      sum: i.quantity * i.price,
+      sum: i.sum ?? i.quantity * i.price,
     }));
     const total = items.reduce((s: number, i: { sum: number }) => s + i.sum, 0);
     const spec = await prisma.specification.create({

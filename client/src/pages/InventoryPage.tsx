@@ -127,8 +127,6 @@ export default function InventoryPage() {
                 <tr className="border-b border-border text-left text-xs uppercase text-muted-2">
                   <th className="px-4 py-3 font-medium">Номенклатура</th>
                   <th className="px-4 py-3 font-medium">Формат</th>
-                  <th className="px-4 py-3 font-medium">Коллекция</th>
-                  <th className="px-4 py-3 font-medium">Цвет</th>
                   <th className="px-4 py-3 font-medium">Сорт</th>
                   <th className="px-4 py-3 text-right font-medium">Остаток, м²</th>
                   <th className="px-4 py-3 text-right font-medium">Резерв</th>
@@ -145,8 +143,6 @@ export default function InventoryPage() {
                     <tr key={inv.id} className="transition hover:bg-panel-2/30">
                       <td className="px-4 py-3 text-slate-200">{inv.product?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-muted">{FORMAT_LABELS[inv.product?.format ?? ''] ?? inv.product?.format}</td>
-                      <td className="px-4 py-3 text-muted">{inv.product?.collection ?? '—'}</td>
-                      <td className="px-4 py-3 text-muted">{inv.product?.color ?? '—'}</td>
                       <td className="px-4 py-3">
                         <span className={cn('chip text-[11px] font-semibold', GRADE_CLASS[inv.grade] ?? 'bg-slate-500/15 text-muted')}>
                           {GRADE_LABELS[inv.grade] ?? inv.grade}

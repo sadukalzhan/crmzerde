@@ -5,16 +5,9 @@ import type { OrderStatus } from '../lib/types';
 
 const MAIN_PATH: OrderStatus[] = [
   'NEW',
-  'SPEC_PREPARATION',
-  'SIGNING',
-  'AWAITING_PAYMENT',
-  'DOCS_CONFIRMED',
   'RESERVATION',
-  'PRODUCTION',
-  'READY',
+  'SPEC_PREPARATION',
   'SHIPMENT',
-  'DELIVERY',
-  'AWAITING_DOCS',
   'CLOSED',
 ];
 
@@ -30,17 +23,10 @@ export function StatusTracker({ status }: { status: OrderStatus }) {
     );
   }
 
-  const isClaim = status === 'CLAIM';
-  const effective: OrderStatus = isClaim ? 'AWAITING_DOCS' : status;
-  const currentIdx = MAIN_PATH.indexOf(effective);
+  const currentIdx = MAIN_PATH.indexOf(status);
 
   return (
     <div className="space-y-3">
-      {isClaim && (
-        <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
-          <AlertTriangle size={16} /> По заявке открыта рекламация
-        </div>
-      )}
       <div className="flex gap-1 overflow-x-auto pb-2">
         {MAIN_PATH.map((s, i) => {
           const done = i < currentIdx;

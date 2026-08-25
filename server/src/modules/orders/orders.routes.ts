@@ -25,7 +25,6 @@ const createSchema = z.object({
         productId: z.string(),
         quantity: z.number().positive(),
         grade: z.enum(['A', 'B', 'C', 'BRAK']).optional(),
-        pricePerUnit: z.number().nonnegative().optional(),
       }),
     )
     .min(1, 'Добавьте хотя бы одну позицию'),
@@ -43,6 +42,8 @@ const paymentSchema = z.object({
 
 const updateSchema = z.object({
   priority: z.enum(['HIGH', 'MEDIUM', 'LOW']).optional(),
+  // Условие оплаты менеджер выбирает на этапе согласования.
+  paymentTerm: z.enum(['PREPAYMENT', 'POSTPAYMENT']).optional(),
   managerId: z.string().nullable().optional(),
   carrierId: z.string().nullable().optional(),
   selfPickup: z.boolean().optional(),
@@ -109,15 +110,6 @@ router.post(
   requireRole('MANAGER', 'SALES_HEAD', 'WAREHOUSE'),
   asyncHandler(async (req, res) => {
     res.json(await service.addToProductionPlan(req.params.id, req.user!));
-  }),
-);
-
-// Регламент, п. 8: клиент подтвердил готовность ждать производство.
-router.post(
-  '/:id/production-accept',
-  requireRole('MANAGER', 'SALES_HEAD', 'CLIENT'),
-  asyncHandler(async (req, res) => {
-    res.json(await service.acceptProduction(req.params.id, req.user!));
   }),
 );
 

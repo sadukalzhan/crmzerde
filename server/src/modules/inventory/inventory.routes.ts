@@ -49,8 +49,6 @@ router.get(
     ws.columns = [
       { header: 'Номенклатура', key: 'name', width: 32 },
       { header: 'Формат', key: 'format', width: 10 },
-      { header: 'Коллекция', key: 'collection', width: 16 },
-      { header: 'Цвет', key: 'color', width: 14 },
       { header: 'Сорт', key: 'grade', width: 8 },
       { header: 'Остаток, м²', key: 'quantity', width: 12 },
       { header: 'Резерв, м²', key: 'reserved', width: 12 },
@@ -63,8 +61,6 @@ router.get(
       ws.addRow({
         name: s.product.name,
         format: FORMAT_LABELS[s.product.format] ?? s.product.format,
-        collection: s.product.collection ?? '',
-        color: s.product.color ?? '',
         grade: GRADE_LABELS[s.grade] ?? s.grade,
         quantity: s.quantity,
         reserved: s.reserved,
@@ -96,13 +92,19 @@ router.get(
     const ws = wb.addWorksheet('Остатки');
     ws.columns = [
       { header: 'Номенклатура', key: 'name', width: 32 },
+      { header: 'Формат', key: 'format', width: 12 },
       { header: 'Сорт', key: 'grade', width: 10 },
       { header: 'Остаток, м²', key: 'quantity', width: 14 },
     ];
     ws.getRow(1).font = { bold: true };
     for (const p of products) {
       for (const grade of ['A', 'B', 'C', 'BRAK']) {
-        ws.addRow({ name: p.name, grade: GRADE_LABELS[grade] ?? grade, quantity: 0 });
+        ws.addRow({
+          name: p.name,
+          format: FORMAT_LABELS[p.format] ?? p.format,
+          grade: GRADE_LABELS[grade] ?? grade,
+          quantity: 0,
+        });
       }
     }
 

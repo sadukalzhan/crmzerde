@@ -19,18 +19,18 @@
   }
   * {
     scrollbar-width: thin;
-    scrollbar-color: #3B3325 transparent;
+    scrollbar-color: #3D2E5A transparent;
   }
   ::-webkit-scrollbar {
     width: 9px;
     height: 9px;
   }
   ::-webkit-scrollbar-thumb {
-    background: #3B3325;
+    background: #3D2E5A;
     border-radius: 8px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #55492F;
+    background: #533E77;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
@@ -41,17 +41,21 @@
   .card {
     @apply rounded-xl border border-border bg-card shadow-card;
   }
-  /* Карточка-показатель с золотой засечкой сверху */
+  /* Карточка-показатель: лёгкая фиолетовая подложка и подсветка сверху */
   .card-kpi {
-    @apply card relative overflow-hidden;
+    @apply card relative overflow-hidden bg-gradient-to-b from-accent-soft to-transparent;
   }
   .card-kpi::before {
     content: '';
-    @apply absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent to-transparent opacity-70;
+    @apply absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent to-transparent opacity-60;
   }
-  /* Тонкая золотая линия-разделитель в заголовках секций */
+  /* Тонкая линия-разделитель в заголовках секций */
   .rule-gold {
-    @apply h-px flex-1 bg-gradient-to-r from-border via-accent/25 to-transparent;
+    @apply h-px flex-1 bg-gradient-to-r from-border via-accent/30 to-transparent;
+  }
+  /* Положительная динамика — бирюзой, как в макете */
+  .delta-up {
+    @apply inline-flex items-center gap-1 text-xs font-medium text-mint;
   }
   .panel {
     @apply rounded-2xl border border-border bg-panel;
@@ -69,8 +73,8 @@
            transition disabled:cursor-not-allowed disabled:opacity-50 select-none;
   }
   .btn-primary {
-    /* Золотая заливка с тёмным текстом — как в макете */
-    @apply btn bg-gold text-[#1A1509] hover:brightness-110 shadow-[0_4px_16px_rgba(201,162,39,0.3)];
+    /* Градиент пурпур → фуксия, как в макете */
+    @apply btn bg-gold text-white hover:brightness-110 shadow-[0_6px_20px_rgba(192,97,245,0.32)];
   }
   .btn-ghost {
     @apply btn border border-border bg-transparent text-slate-300 hover:bg-panel-2 hover:text-white;

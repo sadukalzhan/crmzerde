@@ -1,16 +1,12 @@
 import type { OrderStatus, Role } from './types';
 
 /** Колонки канбана, релевантные роли (зеркало server/src/domain/orderStatus.ts). */
-export function kanbanStatusesForRole(role: Role, all: OrderStatus[]): OrderStatus[] {
-  switch (role) {
-    case 'WAREHOUSE':
-      return ['DOCS_CONFIRMED', 'RESERVATION', 'PRODUCTION', 'READY', 'SHIPMENT'];
-    default:
-      return all;
-  }
+export function kanbanStatusesForRole(_role: Role, all: OrderStatus[]): OrderStatus[] {
+  // Цепочка короткая — показываем её целиком всем ролям.
+  return all;
 }
 
-const DELIVERED: OrderStatus[] = ['DELIVERY', 'AWAITING_DOCS', 'CLOSED'];
+const DELIVERED: OrderStatus[] = ['SHIPMENT', 'CLOSED'];
 
 export function boardStats(orders: { status: OrderStatus }[]) {
   const total = orders.length;

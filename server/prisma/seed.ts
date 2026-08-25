@@ -84,12 +84,13 @@ async function main() {
 
   // Примерные товары в новой модели + остатки по сортам (м²)
   console.log('Номенклатура…');
-  // Остатки создаются нулевыми: актуальные админ заливает импортом из Excel.
+  // Остатки нулевые (админ заливает импортом), цен у номенклатуры нет —
+  // цена появляется только в спецификации на этапе согласования.
   const GRADES = ['A', 'B', 'C', 'BRAK'] as const;
   const products = [
-    { name: 'Cemento Ivory', format: '60x60', collection: 'Cemento', color: 'Ivory', price: 6500 },
-    { name: 'Marmo Statuario', format: '120x60', collection: 'Marmo', color: 'Белый', price: 9000 },
-    { name: 'Concrete Grey', format: '60x60', collection: 'Concrete', color: 'Серый', price: 5500 },
+    { name: 'Cemento Ivory', format: '60x60', collection: 'Cemento', color: 'Ivory' },
+    { name: 'Marmo Statuario', format: '120x60', collection: 'Marmo', color: 'Белый' },
+    { name: 'Concrete Grey', format: '60x60', collection: 'Concrete', color: 'Серый' },
   ];
   for (const p of products) {
     await prisma.product.create({
@@ -100,7 +101,6 @@ async function main() {
         collection: p.collection,
         color: p.color,
         unit: 'M2',
-        pricePerUnit: p.price,
         inventory: {
           create: GRADES.map((grade) => ({ grade, quantity: 0, reserved: 0, unit: 'M2' })),
         },

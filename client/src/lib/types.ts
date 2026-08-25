@@ -3,18 +3,9 @@ export type Role = 'ADMIN' | 'SALES_HEAD' | 'MANAGER' | 'WAREHOUSE' | 'CLIENT';
 export type OrderStatus =
   | 'NEW'
   | 'REJECTED'
-  | 'SPEC_PREPARATION'
-  | 'SIGNING'
-  | 'AWAITING_PAYMENT'
-  | 'DOCS_CONFIRMED'
   | 'RESERVATION'
-  | 'PRODUCTION'
-  | 'READY'
+  | 'SPEC_PREPARATION'
   | 'SHIPMENT'
-  | 'DELIVERY'
-  | 'AWAITING_DOCS'
-  | 'CLAIM'
-  | 'POSTPAYMENT'
   | 'CLOSED';
 
 export interface ReservationHolder {
@@ -85,7 +76,6 @@ export interface Product {
   collection?: string | null;
   color?: string | null;
   unit: Unit;
-  pricePerUnit: number;
   isActive: boolean;
   inventory?: Inventory[];
 }
@@ -109,7 +99,6 @@ export interface OrderItem {
   quantity: number;
   unit: Unit;
   grade: Grade;
-  pricePerUnit: number;
   product?: Product;
 }
 
@@ -179,8 +168,6 @@ export interface Order {
   route?: string | null;
   desiredDate?: string | null;
   productionStartDate?: string | null;
-  /** Регламент, п. 8: когда клиент подтвердил готовность ждать производство. */
-  productionAcceptedAt?: string | null;
   rejectionReason?: string | null;
   closedAt?: string | null;
   createdAt: string;

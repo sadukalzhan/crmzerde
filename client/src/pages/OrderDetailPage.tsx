@@ -10,7 +10,7 @@ import { StatusBadge, PriorityDot, RoleBadge, ProductionPriorityBadge } from '..
 import { StatusTracker } from '../components/StatusTracker';
 import {
   useOrder, useMeta, useProducts, useTransition, useUpdatePayment,
-  useAvailability, useAcceptProduction, useReleaseReservation,
+  useAvailability, useReleaseReservation,
   useUploadDocument, useSignSpec, useCreateSpec, useCreateContract, useSignContract, useUpdateClaim,
   useCreateClaim, useUpdateOrder, useDeleteOrder, useUsers,  useCarriers,
 } from '../lib/queries';
@@ -39,7 +39,6 @@ export default function OrderDetailPage() {
   const transition = useTransition();
   // Регламент, п. 2-5: проверка остатков и резервов доступна только сотрудникам.
   const { data: availability } = useAvailability(isStaff ? id : undefined);
-  const acceptProduction = useAcceptProduction();
   const releaseReservation = useReleaseReservation();
   const updatePayment = useUpdatePayment();
   const uploadDoc = useUploadDocument();
@@ -74,11 +73,9 @@ export default function OrderDetailPage() {
   const allowed = (meta.transitions[order.status] ?? []).filter(
     (tr) => user.role === 'ADMIN' || tr.roles.includes(user.role),
   );
-  const itemsTotal = order.items.reduce((s, i) => s + i.quantity * i.pricePerUnit, 0);
 
   const move = (to: OrderStatus) => {
     if (to === 'REJECTED') { setReject(true); setReason(''); return; }
-    if (to === 'CLAIM') { setClaimOpen(true); setClaimText(''); return; }
     transition.mutate(
       { id: order.id, to },
       {
@@ -161,8 +158,6 @@ export default function OrderDetailPage() {
                     <th className="py-2 pr-4 font-medium">Номенклатура</th>
                     <th className="py-2 pr-4 font-medium">Сорт</th>
                     <th className="py-2 pr-4 font-medium">Объём (м² · кор. · под.)</th>
-                    {isStaff && <th className="py-2 pr-4 font-medium">Цена/м²</th>}
-                    {isStaff && <th className="py-2 font-medium">Сумма</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -175,20 +170,12 @@ export default function OrderDetailPage() {
                         <td className="py-2.5 pr-4 text-muted">
                           {fmtM2(it.quantity)} · {boxes(it.quantity, fmt, it.grade)} кор. · {pallets(it.quantity, fmt, it.grade)} под.
                         </td>
-                        {isStaff && <td className="py-2.5 pr-4 text-muted">{fmtMoney(it.pricePerUnit)}</td>}
-                        {isStaff && <td className="py-2.5 font-medium text-slate-200">{fmtMoney(it.quantity * it.pricePerUnit)}</td>}
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-            {isStaff && (
-              <div className="mt-3 flex justify-end border-t border-border pt-3 text-sm">
-                <span className="text-muted">Итого:&nbsp;</span>
-                <span className="font-bold text-white">{fmtMoney(itemsTotal)}</span>
-              </div>
-            )}
           </Section>
 
           {/* Остатки и резервы — Регламент, п. 2-5 */}
@@ -447,25 +434,6 @@ export default function OrderDetailPage() {
           {/* Действия */}
           <Section title="Действия">
             <div className="space-y-2">
-              {/* Регламент, п. 8: фиксация ответа клиента о готовности ждать производство */}
-              {!order.productionAcceptedAt && (user.role === 'MANAGER' || user.role === 'ADMIN') && (
-                <button
-                  onClick={() =>
-                    acceptProduction.mutate(order.id, {
-                      onSuccess: () => toast.success('Согласие клиента зафиксировано'),
-                      onError: (e) => toast.error(apiError(e)),
-                    })
-                  }
-                  className="btn-soft w-full"
-                >
-                  <CheckCircle2 size={16} /> Клиент готов ждать производство
-                </button>
-              )}
-              {order.productionAcceptedAt && (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
-                  <CheckCircle2 size={14} /> Клиент подтвердил ожидание производства {fmtDate(order.productionAcceptedAt)}
-                </div>
-              )}
               {allowed.length === 0 ? (
                 <p className="text-sm text-muted-2">Нет доступных переходов для вашей роли на этом этапе.</p>
               ) : (
@@ -500,6 +468,29 @@ export default function OrderDetailPage() {
           {/* Оплата */}
           {(user.role === 'MANAGER' || user.role === 'SALES_HEAD' || user.role === 'ADMIN') && (
             <Section title="Оплата">
+              {/* Условие оплаты менеджер выбирает на согласовании. При авансе
+                  заявка не уйдёт в отгрузку, пока оплата не отмечена как полученная. */}
+              <div className="mb-3">
+                <label className="label">Условие оплаты</label>
+                <select
+                  className="input"
+                  value={order.paymentTerm}
+                  onChange={(e) =>
+                    updateOrder.mutate(
+                      { id: order.id, data: { paymentTerm: e.target.value } },
+                      { onSuccess: () => toast.success('Условие оплаты обновлено'), onError: (err) => toast.error(apiError(err)) },
+                    )
+                  }
+                >
+                  <option value="PREPAYMENT">Аванс</option>
+                  <option value="POSTPAYMENT">Постоплата</option>
+                </select>
+                {order.paymentTerm === 'PREPAYMENT' && order.paymentStatus !== 'PAID' && (
+                  <p className="mt-2 text-xs text-amber-300">
+                    Аванс не получен — отгрузка недоступна.
+                  </p>
+                )}
+              </div>
               <PaymentControl
                 current={order.paymentStatus}
                 onApply={(status) =>
@@ -516,7 +507,6 @@ export default function OrderDetailPage() {
               <Info label="Менеджер" value={order.manager?.fullName ?? '—'} />
               <Info label="Доставка" value={order.selfPickup ? 'Самовывоз' : order.carrier?.name ?? '—'} />
               <Info label="Желаемая дата" value={fmtDate(order.desiredDate)} />
-              <Info label="Запуск в произв." value={fmtDate(order.productionStartDate)} />
               {order.closedAt && <Info label="Закрыта" value={fmtDate(order.closedAt)} />}
             </dl>
           </Section>
@@ -765,7 +755,7 @@ function SpecModal({
 }: {
   open: boolean;
   onClose: () => void;
-  products: { id: string; name: string; pricePerUnit: number }[];
+  products: { id: string; name: string }[];
   onCreate: (p: { number: string; items: SpecItemRow[] }) => void;
   defaultNumber: string;
 }) {
@@ -808,7 +798,7 @@ function SpecModal({
                   value={r.productId}
                   onChange={(e) => {
                     const p = products.find((x) => x.id === e.target.value);
-                    setRow(i, { productId: e.target.value, name: p?.name ?? '', price: p?.pricePerUnit ?? 0 });
+                    setRow(i, { productId: e.target.value, name: p?.name ?? '' });
                   }}
                 >
                   <option value="">Выберите номенклатуру</option>

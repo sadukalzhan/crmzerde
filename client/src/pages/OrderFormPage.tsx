@@ -26,16 +26,11 @@ export default function OrderFormPage() {
   const [carrierId, setCarrierId] = useState('');
   const [selfPickup, setSelfPickup] = useState(false);
   const [priority, setPriority] = useState('MEDIUM');
-  const [paymentTerm, setPaymentTerm] = useState('PREPAYMENT');
   const [shipTo, setShipTo] = useState('');
   const [desiredDate, setDesiredDate] = useState('');
   const [rows, setRows] = useState<ItemRow[]>([{ productId: '', quantity: 1, grade: 'A' }]);
 
   const setRow = (i: number, patch: Partial<ItemRow>) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  const total = rows.reduce((s, r) => {
-    const p = products.find((x) => x.id === r.productId);
-    return s + (p ? p.pricePerUnit * r.quantity : 0);
-  }, 0);
   // Завод один — город отгрузки постоянный.
   const SHIP_FROM = 'Актобе';
 
@@ -44,8 +39,7 @@ export default function OrderFormPage() {
     const items = rows
       .filter((r) => r.productId && r.quantity > 0)
       .map((r) => {
-        const p = products.find((x) => x.id === r.productId)!;
-        return { productId: r.productId, quantity: r.quantity, grade: r.grade, pricePerUnit: p.pricePerUnit };
+        return { productId: r.productId, quantity: r.quantity, grade: r.grade };
       });
     if (items.length === 0) return toast.error('Добавьте хотя бы одну позицию');
     if (!isClient && !clientId) return toast.error('Выберите клиента');
@@ -56,7 +50,6 @@ export default function OrderFormPage() {
         carrierId: selfPickup ? undefined : carrierId || undefined,
         selfPickup,
         priority: isClient ? undefined : priority,
-        paymentTerm,
         shipFrom: SHIP_FROM,
         shipTo: shipTo || undefined,
         desiredDate: desiredDate || undefined,
@@ -99,7 +92,7 @@ export default function OrderFormPage() {
                         <select className="input" value={r.productId} onChange={(e) => setRow(i, { productId: e.target.value })}>
                           <option value="">Выберите товар…</option>
                           {products.map((op) => (
-                            <option key={op.id} value={op.id}>{op.name} ({op.format?.replace('x', '×')}) — {fmtMoney(op.pricePerUnit)}/м²</option>
+                            <option key={op.id} value={op.id}>{op.name} ({op.format?.replace('x', '×')})</option>
                           ))}
                         </select>
                       </div>
@@ -129,10 +122,10 @@ export default function OrderFormPage() {
                 <Plus size={14} /> Добавить позицию
               </button>
             </div>
-            <div className="mt-4 flex justify-end border-t border-border pt-3 text-sm">
-              <span className="text-muted">Ориентировочная сумма:&nbsp;</span>
-              <span className="font-bold text-white">{fmtMoney(total)}</span>
-            </div>
+            <p className="mt-4 border-t border-border pt-3 text-xs text-muted">
+              Цены в заявке не указываются — их проставит менеджер в спецификации
+              на этапе согласования.
+            </p>
           </div>
 
           {/* Доставка */}
@@ -177,12 +170,6 @@ export default function OrderFormPage() {
                   </select>
                 </Field>
               )}
-              <Field label="Условие оплаты">
-                <select className="input" value={paymentTerm} onChange={(e) => setPaymentTerm(e.target.value)}>
-                  <option value="PREPAYMENT">Аванс</option>
-                  <option value="POSTPAYMENT">Постоплата</option>
-                </select>
-              </Field>
               {/* Приоритет ставит только менеджер — клиенту поле не показываем. */}
               {!isClient && (
                 <Field label="Приоритет">

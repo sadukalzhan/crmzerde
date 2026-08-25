@@ -5,8 +5,19 @@
 // ни одного разрешённого перехода, а карточка падала бы на поиске метаданных.
 import { PrismaClient } from '@prisma/client';
 
+// Цепочка сокращена до: новая → резерв → согласование → отгрузка → завершено.
+// Заявки, стоящие на упразднённых этапах, переносим в ближайший действующий.
 const REMOVED_STATUSES: Record<string, string> = {
-  CREDIT_CHECK: 'SPEC_PREPARATION',
+  CREDIT_CHECK: 'NEW',
+  SIGNING: 'SPEC_PREPARATION',
+  AWAITING_PAYMENT: 'SPEC_PREPARATION',
+  DOCS_CONFIRMED: 'RESERVATION',
+  PRODUCTION: 'RESERVATION',
+  READY: 'RESERVATION',
+  DELIVERY: 'SHIPMENT',
+  AWAITING_DOCS: 'SHIPMENT',
+  CLAIM: 'SHIPMENT',
+  POSTPAYMENT: 'SHIPMENT',
 };
 
 // Роли завода, логиста и бухгалтера упразднены. Учётки не удаляем, а переводим

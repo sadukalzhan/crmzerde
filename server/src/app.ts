@@ -46,7 +46,22 @@ export function createApp() {
       dbError = (err as { code?: string })?.code ?? (err as Error)?.name;
       console.error('[HEALTH] База недоступна:', err);
     }
-    res.json({ ok: true, db, ...(dbError ? { dbError } : {}), ts: Date.now() });
+    // Самопроверка генератора PDF по запросу: /api/health?check=pdf.
+    // Нужна, чтобы отличить поломку окружения (шрифты, зависимости) от ошибки
+    // данных — снаружи иначе видно только «Внутренняя ошибка сервера».
+    let pdf: string | undefined;
+    if (_req.query.check === 'pdf') {
+      try {
+        const { renderPdf } = await import('./lib/pdf');
+        const buf = await renderPdf({ content: [{ text: 'проверка' }] });
+        pdf = `ok:${buf.length}`;
+      } catch (err) {
+        pdf = `error: ${(err as Error)?.message ?? String(err)}`;
+        console.error('[HEALTH] PDF недоступен:', err);
+      }
+    }
+
+    res.json({ ok: true, db, ...(dbError ? { dbError } : {}), ...(pdf ? { pdf } : {}), ts: Date.now() });
   });
 
   app.use('/api/auth', authRoutes);

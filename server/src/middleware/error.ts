@@ -44,6 +44,9 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     res.status(409).json({ error: 'Нарушение уникальности (запись уже существует)' });
     return;
   }
+  // Внутренние ошибки отдаём с текстом причины: это корпоративная система за
+  // авторизацией, а без причины отладка на проде превращается в угадывание.
   console.error('[ERROR]', err);
-  res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+  res.status(500).json({ error: 'Внутренняя ошибка сервера', detail });
 }

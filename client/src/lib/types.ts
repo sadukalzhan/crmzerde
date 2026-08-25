@@ -41,7 +41,17 @@ export type Priority = 'HIGH' | 'MEDIUM' | 'LOW';
 export type PaymentTerm = 'PREPAYMENT' | 'POSTPAYMENT';
 export type PaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID' | 'POSTPAY_APPROVED';
 export type Unit = 'M2' | 'PALLET';
-export type Grade = 'A' | 'B' | 'C' | 'BRAK';
+// Сорт — свободный код из справочника: A, A1, R3, B, B12, C, BRAK и другие.
+export type Grade = string;
+
+export interface GradeRef {
+  id: string;
+  code: string;
+  label: string;
+  noBox: boolean;
+  sortOrder: number;
+  isActive: boolean;
+}
 export type Format = '60x60' | '120x60';
 
 export interface User {
@@ -63,6 +73,13 @@ export interface Client {
   phone?: string | null;
   bin?: string | null;
   address?: string | null;
+  actualAddress?: string | null;
+  bankName?: string | null;
+  bankAccount?: string | null;
+  bik?: string | null;
+  vatCert?: string | null;
+  kbe?: string | null;
+  director?: string | null;
   managerId?: string | null;
   manager?: { id: string; fullName: string } | null;
   _count?: { orders: number };

@@ -6,6 +6,9 @@ import { requireRole } from '../../middleware/rbac';
 import { validateBody } from '../../middleware/validate';
 import { asyncHandler, forbidden } from '../../middleware/error';
 import { notify } from '../../lib/notify';
+import { renderPdf } from '../../lib/pdf';
+import { buildSpecificationPdf } from './specification.pdf';
+import { boxes as calcBoxes, pallets as calcPallets } from '../../domain/packaging';
 
 const router = Router();
 router.use(authenticate);
@@ -49,12 +52,26 @@ router.post(
       orderId: z.string(),
       number: z.string(),
       fileUrl: z.string().optional(),
+      // Шапка и условия печатной формы.
+      contractNumber: z.string().optional(),
+      contractDate: z.string().optional(),
+      city: z.string().optional(),
+      currency: z.enum(['KZT', 'RUB']).default('KZT'),
+      includesVat: z.boolean().default(true),
+      deliveryTerms: z.string().optional(),
+      shipmentTerms: z.string().optional(),
+      paymentTerms: z.string().optional(),
       items: z
         .array(
           z.object({
             productId: z.string().optional(),
             name: z.string(),
+            format: z.string().default('60x60'),
+            toneCaliber: z.string().optional(),
+            grade: z.string().optional(), // для расчёта упаковки
             quantity: z.number().positive(),
+            pallets: z.number().int().nonnegative().optional(),
+            boxes: z.number().int().nonnegative().optional(),
             unit: z.enum(['PALLET', 'M2']).default('M2'),
             price: z.number().nonnegative(),
             // Сумму менеджер может проставить вручную (скидка, округление);
@@ -66,16 +83,46 @@ router.post(
     }),
   ),
   asyncHandler(async (req, res) => {
-    const items = req.body.items.map((i: { quantity: number; price: number; sum?: number }) => ({
-      ...i,
-      sum: i.sum ?? i.quantity * i.price,
-    }));
+    // Паллеты и коробки считаются из объёма и формата, но менеджер может
+    // переопределить их вручную — в документе печатается то, что отгружается.
+    type ItemInput = {
+      productId?: string;
+      name: string;
+      format: string;
+      toneCaliber?: string;
+      grade?: string;
+      quantity: number;
+      pallets?: number;
+      boxes?: number;
+      unit: string;
+      price: number;
+      sum?: number;
+    };
+    const items = (req.body.items as ItemInput[]).map((i) => {
+      const grade = i.grade ?? 'A';
+      // grade в позицию не пишем — он нужен только для расчёта упаковки.
+      const { grade: _g, ...rest } = { ...i, grade };
+      return {
+        ...rest,
+        pallets: i.pallets ?? calcPallets(i.quantity, i.format, grade),
+        boxes: i.boxes ?? calcBoxes(i.quantity, i.format, grade),
+        sum: i.sum ?? i.quantity * i.price,
+      };
+    });
     const total = items.reduce((s: number, i: { sum: number }) => s + i.sum, 0);
     const spec = await prisma.specification.create({
       data: {
         orderId: req.body.orderId,
         number: req.body.number,
         fileUrl: req.body.fileUrl,
+        contractNumber: req.body.contractNumber,
+        contractDate: req.body.contractDate ? new Date(req.body.contractDate) : null,
+        city: req.body.city || undefined,
+        currency: req.body.currency,
+        includesVat: req.body.includesVat,
+        deliveryTerms: req.body.deliveryTerms,
+        shipmentTerms: req.body.shipmentTerms,
+        paymentTerms: req.body.paymentTerms,
         total,
         managerSigned: true,
         managerSignedAt: new Date(),
@@ -127,6 +174,40 @@ router.post(
       throw forbidden();
     }
     res.json(await prisma.specification.update({ where: { id: spec.id }, data, include: { items: true } }));
+  }),
+);
+
+// Печатная форма спецификации в PDF.
+router.get(
+  '/:id/pdf',
+  asyncHandler(async (req, res) => {
+    const spec = await prisma.specification.findUniqueOrThrow({
+      where: { id: req.params.id },
+      include: { items: true, order: { include: { client: true } } },
+    });
+    await assertOrderAccess(spec.orderId, req.user!.id, req.user!.role);
+
+    const pdf = await renderPdf(
+      buildSpecificationPdf({
+        number: spec.number,
+        contractNumber: spec.contractNumber,
+        contractDate: spec.contractDate,
+        city: spec.city,
+        issuedAt: spec.issuedAt,
+        currency: spec.currency,
+        includesVat: spec.includesVat,
+        deliveryTerms: spec.deliveryTerms,
+        shipmentTerms: spec.shipmentTerms,
+        paymentTerms: spec.paymentTerms,
+        total: spec.total,
+        items: spec.items,
+        dealer: spec.order.client,
+      }),
+    );
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="specification-${spec.number}.pdf"`);
+    res.send(pdf);
   }),
 );
 

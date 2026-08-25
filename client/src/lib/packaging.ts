@@ -8,12 +8,15 @@ export const FORMAT_LABELS: Record<string, string> = {
   '120x60': '120×60',
 };
 
-export const GRADES = ['A', 'B', 'C', 'BRAK'] as const;
-export type Grade = (typeof GRADES)[number];
+// Базовый набор сортов; фактический список ведётся в справочнике.
+export const GRADES = ['A', 'A1', 'R3', 'B', 'B12', 'C', 'BRAK'] as const;
 
 export const GRADE_LABELS: Record<string, string> = {
   A: 'A сорт',
+  A1: 'A1',
+  R3: 'R3',
   B: 'B сорт',
+  B12: 'B12',
   C: 'C сорт',
   BRAK: 'Брак',
 };

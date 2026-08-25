@@ -9,15 +9,23 @@ export const FORMAT_LABELS: Record<string, string> = {
   '120x60': '120×60',
 };
 
-export const GRADES = ['A', 'B', 'C', 'BRAK'] as const;
+// Базовые сорта: ими наполняется справочник при первом запуске и на них
+// опираются расчёты, если справочник ещё пуст.
+export const GRADES = ['A', 'A1', 'R3', 'B', 'B12', 'C', 'BRAK'] as const;
 export type Grade = (typeof GRADES)[number];
 
 export const GRADE_LABELS: Record<string, string> = {
   A: 'A сорт',
+  A1: 'A1',
+  R3: 'R3',
   B: 'B сорт',
+  B12: 'B12',
   C: 'C сорт',
   BRAK: 'Брак',
 };
+
+/** Сорта, которые отгружаются без коробок (считаются плитками на поддоне). */
+export const NO_BOX_GRADES = ['C', 'BRAK'];
 
 interface FormatSpec {
   m2PerBox: number; // кв.м в одной коробке
@@ -31,7 +39,7 @@ export const FORMAT_SPECS: Record<string, FormatSpec> = {
   '120x60': { m2PerBox: 1.44, boxesPerPallet: 30, m2PerTile: 0.72, maxTilesPerPallet: 70 },
 };
 
-const noBox = (grade: string) => grade === 'C' || grade === 'BRAK';
+const noBox = (grade: string) => NO_BOX_GRADES.includes(grade);
 
 /** Кол-во коробок. На C и Брак коробки не используются → 0. Округление вверх. */
 export function boxes(m2: number, format: string, grade: string): number {

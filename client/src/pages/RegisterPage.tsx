@@ -10,7 +10,12 @@ import { toast } from '../components/toast';
 export default function RegisterPage() {
   const navigate = useNavigate();
   const register = useAuth((s) => s.register);
-  const [form, setForm] = useState({ fullName: '', email: '', password: '', companyName: '', phone: '', bin: '', address: '' });
+  const [form, setForm] = useState({
+    fullName: '', email: '', password: '', companyName: '', phone: '',
+    // Реквизиты попадают в спецификацию как есть — просим сразу при регистрации.
+    bin: '', address: '', actualAddress: '', bankName: '', bankAccount: '',
+    bik: '', vatCert: '', kbe: '', director: '',
+  });
   const [loading, setLoading] = useState(false);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
@@ -54,9 +59,35 @@ export default function RegisterPage() {
             <input className="input" type="password" value={form.password} onChange={set('password')} required minLength={6} />
           </Field>
         </div>
-        <Field label="Адрес">
+        <Field label="Юридический адрес">
           <input className="input" value={form.address} onChange={set('address')} />
         </Field>
+        <Field label="Фактический адрес">
+          <input className="input" value={form.actualAddress} onChange={set('actualAddress')} />
+        </Field>
+
+        <div className="rounded-lg border border-border bg-bg-elevated p-3">
+          <p className="mb-3 text-xs text-muted">
+            Банковские реквизиты и подписант — они печатаются в спецификации.
+            Можно заполнить позже, менеджер дополнит.
+          </p>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Банк"><input className="input" value={form.bankName} onChange={set('bankName')} /></Field>
+              <Field label="БИК"><input className="input" value={form.bik} onChange={set('bik')} /></Field>
+            </div>
+            <Field label="ИИК / расчётный счёт">
+              <input className="input" value={form.bankAccount} onChange={set('bankAccount')} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Свидетельство НДС"><input className="input" value={form.vatCert} onChange={set('vatCert')} /></Field>
+              <Field label="Кбе"><input className="input" value={form.kbe} onChange={set('kbe')} /></Field>
+            </div>
+            <Field label="Директор (подписант)">
+              <input className="input" value={form.director} onChange={set('director')} placeholder="Иванов И. И." />
+            </Field>
+          </div>
+        </div>
         <button className="btn-primary w-full" disabled={loading}>
           <UserPlus size={18} /> {loading ? 'Создание…' : 'Зарегистрироваться'}
         </button>

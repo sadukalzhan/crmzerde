@@ -61,15 +61,23 @@ model PasswordResetToken {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Client {
-  id          String   @id @default(cuid())
-  companyName String
-  contactName String?
-  email       String?
-  phone       String?
-  bin         String? // БИН/ИНН — реквизиты
-  address     String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  companyName   String
+  contactName   String?
+  email         String?
+  phone         String?
+  // Реквизиты дилера — печатаются в спецификации как есть.
+  bin           String? // БИН / ИИН / ИНН
+  address       String? // юридический адрес
+  actualAddress String? // фактический адрес
+  bankName      String?
+  bankAccount   String? // ИИК / расчётный счёт
+  bik           String?
+  vatCert       String? // свидетельство о постановке на учёт по НДС
+  kbe           String?
+  director      String? // подписант со стороны дилера
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Аккаунт-логин клиента (роль CLIENT), один-к-одному
   userId String? @unique
@@ -103,6 +111,17 @@ model Product {
   orderItems         OrderItem[]
   specificationItems SpecificationItem[]
   reservations       Reservation[]
+}
+
+// Справочник сортов. Сорт пишется не только как «A» или «B», но и как
+// «A1», «R3», «B12» — поэтому список ведётся в справочнике, а не в коде.
+model Grade {
+  id        String  @id @default(cuid())
+  code      String  @unique // A | A1 | R3 | B | B12 | C | BRAK
+  label     String // как показывать: «A сорт», «Брак»
+  noBox     Boolean @default(false) // отгружается без коробок (C, брак)
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
 }
 
 model Carrier {
@@ -194,12 +213,23 @@ model OrderItem {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Specification {
-  id              String    @id @default(cuid())
-  orderId         String
-  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  number          String
-  fileUrl         String?
-  total           Float     @default(0)
+  id      String  @id @default(cuid())
+  orderId String
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  number  String
+  fileUrl String?
+  total   Float   @default(0)
+
+  // Печатная форма: шапка и условия. Заполняются при создании спецификации.
+  contractNumber  String?
+  contractDate    DateTime?
+  city            String    @default("г. Актобе")
+  issuedAt        DateTime  @default(now())
+  currency        String    @default("KZT") // KZT | RUB
+  includesVat     Boolean   @default(true)
+  deliveryTerms   String? // условия поставки
+  shipmentTerms   String? // сроки отгрузки
+  paymentTerms    String? // условия оплаты
   managerSigned   Boolean   @default(false)
   managerSignedAt DateTime?
   clientSigned    Boolean   @default(false)
@@ -215,10 +245,14 @@ model SpecificationItem {
   specification   Specification @relation(fields: [specificationId], references: [id], onDelete: Cascade)
   productId       String?
   product         Product?      @relation(fields: [productId], references: [id])
-  name            String
-  quantity        Float
+  name            String // номенклатура
+  format          String        @default("60x60") // размер, см
+  toneCaliber     String? // тон/калибр
+  quantity        Float // кол-во м²
+  pallets         Int           @default(0)
+  boxes           Int           @default(0)
   unit            String        @default("M2")
-  price           Float         @default(0)
+  price           Float         @default(0) // цена за 1 м²
   sum             Float         @default(0)
 }
 

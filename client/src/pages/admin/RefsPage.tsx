@@ -3,14 +3,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Upload, FileSpreadsheet } from 'lucide-react';
 import { Page, PageHeader } from '../../components/PageHeader';
 import { PageLoader, EmptyState, Modal, Field } from '../../components/ui';
-import { useCarriers, useProducts } from '../../lib/queries';
+import { useCarriers, useProducts, useGrades } from '../../lib/queries';
 import { api, apiError } from '../../lib/api';
 import { toast } from '../../components/toast';
 import { fmtMoney } from '../../lib/format';
 import { FORMAT_LABELS } from '../../lib/packaging';
 import { cn } from '../../lib/cn';
 
-type Tab = 'products' | 'carriers';
+type Tab = 'products' | 'grades' | 'carriers';
 
 export default function RefsPage() {
   const qc = useQueryClient();
@@ -57,12 +57,14 @@ export default function RefsPage() {
 
   const { data: carriers = [], isLoading: l2 } = useCarriers();
   const { data: products = [], isLoading: l3 } = useProducts();
+  const { data: grades = [], isLoading: l4 } = useGrades();
 
-  if (l2 || l3) return <PageLoader />;
+  if (l2 || l3 || l4) return <PageLoader />;
 
   const tabs: { k: Tab; label: string; count: number }[] = [
     { k: 'carriers', label: 'Перевозчики', count: carriers.length },
     { k: 'products', label: 'Номенклатура', count: products.length },
+    { k: 'grades', label: 'Сорта', count: grades.length },
   ];
   const invalidate = (key: string) => qc.invalidateQueries({ queryKey: [key] });
 
@@ -94,6 +96,20 @@ export default function RefsPage() {
       </div>
 
       <div className="card overflow-hidden">
+        {tab === 'grades' && (
+          grades.length === 0 ? <EmptyState title="Нет сортов" /> :
+          <ul className="divide-y divide-border">
+            {grades.map((g) => (
+              <li key={g.id} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <span className="font-medium text-slate-100">{g.label}</span>
+                  <span className="ml-2 text-xs text-muted-2">код {g.code}</span>
+                </div>
+                {g.noBox && <span className="chip bg-amber-500/15 text-amber-300">без коробок</span>}
+              </li>
+            ))}
+          </ul>
+        )}
         {tab === 'carriers' && (
           carriers.length === 0 ? <EmptyState title="Нет перевозчиков" /> :
           <ul className="divide-y divide-border">
@@ -135,7 +151,14 @@ function AddModal({ tab, open, onClose, onDone }: { tab: Tab; open: boolean; onC
 
   const save = async () => {
     try {
-      if (tab === 'carriers') {
+      if (tab === 'grades') {
+        await api.post('/refs/grades', {
+          code: form.code,
+          label: form.label || form.code,
+          noBox: form.noBox === 'on',
+        });
+        onDone('grades');
+      } else if (tab === 'carriers') {
         await api.post('/refs/carriers', { name: form.name, phone: form.phone });
         onDone('carriers');
       } else {
@@ -157,6 +180,21 @@ function AddModal({ tab, open, onClose, onDone }: { tab: Tab; open: boolean; onC
   return (
     <Modal open={open} onClose={onClose} title="Новая запись" footer={<><button className="btn-ghost" onClick={onClose}>Отмена</button><button className="btn-primary" onClick={save}>Создать</button></>}>
       <div className="space-y-3">
+        {tab === 'grades' && (
+          <>
+            <Field label="Код сорта"><input className="input" value={form.code ?? ''} onChange={set('code')} placeholder="A1, R3, B12" /></Field>
+            <Field label="Как показывать"><input className="input" value={form.label ?? ''} onChange={set('label')} placeholder="A1" /></Field>
+            <label className="flex items-center gap-2 text-sm text-slate-200">
+              <input
+                type="checkbox"
+                checked={form.noBox === 'on'}
+                onChange={(e) => setForm({ ...form, noBox: e.target.checked ? 'on' : '' })}
+                className="h-4 w-4 accent-[#A855F7]"
+              />
+              Отгружается без коробок (как C и брак)
+            </label>
+          </>
+        )}
         {tab === 'carriers' && (
           <>
             <Field label="Название"><input className="input" value={form.name ?? ''} onChange={set('name')} /></Field>

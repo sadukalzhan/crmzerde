@@ -74,6 +74,21 @@ export default function OrderDetailPage() {
     (tr) => user.role === 'ADMIN' || tr.roles.includes(user.role),
   );
 
+  // Печатная форма спецификации приходит с сервера готовым PDF.
+  const downloadSpecPdf = async (id: string, number: string) => {
+    try {
+      const res = await api.get(`/specifications/${id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Спецификация-${number}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
+
   const move = (to: OrderStatus) => {
     if (to === 'REJECTED') { setReject(true); setReason(''); return; }
     transition.mutate(
@@ -280,7 +295,7 @@ export default function OrderDetailPage() {
           <Section
             title="Спецификации"
             action={
-              user.role === 'MANAGER' || user.role === 'ADMIN' ? (
+              user.role === 'MANAGER' || user.role === 'SALES_HEAD' || user.role === 'ADMIN' ? (
                 <button onClick={() => setSpecOpen(true)} className="btn-soft px-3 py-1.5 text-xs"><Plus size={14} /> Создать</button>
               ) : undefined
             }
@@ -298,7 +313,14 @@ export default function OrderDetailPage() {
                     <div className="flex items-center gap-2">
                       <SignChip label="Менеджер" signed={sp.managerSigned} />
                       <SignChip label="Клиент" signed={sp.clientSigned} />
-                      {((user.role === 'MANAGER' && !sp.managerSigned) || (user.role === 'CLIENT' && !sp.clientSigned)) && (
+                      <button
+                        onClick={() => downloadSpecPdf(sp.id, sp.number)}
+                        className="btn-soft px-2.5 py-1 text-xs"
+                        title="Скачать печатную форму"
+                      >
+                        <Download size={13} /> PDF
+                      </button>
+                      {(((user.role === 'MANAGER' || user.role === 'SALES_HEAD') && !sp.managerSigned) || (user.role === 'CLIENT' && !sp.clientSigned)) && (
                         <button
                           onClick={() => signSpec.mutate(sp.id, { onSuccess: () => toast.success('Подписано') })}
                           className="btn-primary px-2.5 py-1 text-xs"
@@ -748,24 +770,43 @@ function PaymentControl({ current, onApply, labels }: { current: string; onApply
   );
 }
 
-interface SpecItemRow { productId: string; name: string; quantity: number; price: number }
+interface SpecItemRow {
+  productId: string;
+  name: string;
+  format: string;
+  toneCaliber?: string;
+  quantity: number;
+  price: number;
+  /** Сумму можно задать вручную — иначе количество × цена. */
+  sum?: number;
+}
 
 function SpecModal({
   open, onClose, products, onCreate, defaultNumber,
 }: {
   open: boolean;
   onClose: () => void;
-  products: { id: string; name: string }[];
-  onCreate: (p: { number: string; items: SpecItemRow[] }) => void;
+  products: { id: string; name: string; format?: string }[];
+  onCreate: (p: Record<string, unknown>) => void;
   defaultNumber: string;
 }) {
   const [number, setNumber] = useState(defaultNumber);
-  const [rows, setRows] = useState<SpecItemRow[]>([{ productId: '', name: '', quantity: 1, price: 0 }]);
+  // Шапка и условия печатной формы — заполняются здесь, на согласовании.
+  const [contractNumber, setContractNumber] = useState('');
+  const [contractDate, setContractDate] = useState('');
+  const [currency, setCurrency] = useState('KZT');
+  const [includesVat, setIncludesVat] = useState(true);
+  const [deliveryTerms, setDeliveryTerms] = useState('');
+  const [shipmentTerms, setShipmentTerms] = useState('');
+  const [paymentTerms, setPaymentTerms] = useState('');
+  const [rows, setRows] = useState<SpecItemRow[]>([
+    { productId: '', name: '', format: '60x60', toneCaliber: '', quantity: 1, price: 0 },
+  ]);
 
   const setRow = (i: number, patch: Partial<SpecItemRow>) =>
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
 
-  const total = rows.reduce((s, r) => s + r.quantity * r.price, 0);
+  const total = rows.reduce((s, r) => s + (r.sum ?? r.quantity * r.price), 0);
 
   return (
     <Modal
@@ -778,7 +819,19 @@ function SpecModal({
           <button className="btn-ghost" onClick={onClose}>Отмена</button>
           <button
             className="btn-primary"
-            onClick={() => onCreate({ number, items: rows.filter((r) => r.name && r.quantity > 0) })}
+            onClick={() =>
+              onCreate({
+                number,
+                contractNumber: contractNumber || undefined,
+                contractDate: contractDate || undefined,
+                currency,
+                includesVat,
+                deliveryTerms: deliveryTerms || undefined,
+                shipmentTerms: shipmentTerms || undefined,
+                paymentTerms: paymentTerms || undefined,
+                items: rows.filter((r) => r.name && r.quantity > 0),
+              })
+            }
           >
             Создать
           </button>
@@ -786,34 +839,87 @@ function SpecModal({
       }
     >
       <div className="space-y-4">
-        <Field label="Номер спецификации">
-          <input className="input" value={number} onChange={(e) => setNumber(e.target.value)} />
-        </Field>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Field label="Номер спецификации">
+            <input className="input" value={number} onChange={(e) => setNumber(e.target.value)} />
+          </Field>
+          <Field label="Номер договора">
+            <input className="input" value={contractNumber} onChange={(e) => setContractNumber(e.target.value)} placeholder="KSN-0003" />
+          </Field>
+          <Field label="Дата договора">
+            <input className="input" type="date" value={contractDate} onChange={(e) => setContractDate(e.target.value)} />
+          </Field>
+          <Field label="Валюта">
+            <select className="input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+              <option value="KZT">Тенге</option>
+              <option value="RUB">Рубли</option>
+            </select>
+          </Field>
+        </div>
+
         <div className="space-y-2">
+          <div className="hidden gap-2 text-[11px] uppercase text-muted-2 sm:flex">
+            <span className="flex-1">Номенклатура</span>
+            <span className="w-24">Тон/калибр</span>
+            <span className="w-20">Кол-во м²</span>
+            <span className="w-24">Цена за м²</span>
+            <span className="w-28">Сумма</span>
+            <span className="w-9" />
+          </div>
           {rows.map((r, i) => (
-            <div key={i} className="flex items-end gap-2">
-              <div className="flex-1">
+            <div key={i} className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[180px] flex-1">
                 <select
                   className="input"
                   value={r.productId}
                   onChange={(e) => {
                     const p = products.find((x) => x.id === e.target.value);
-                    setRow(i, { productId: e.target.value, name: p?.name ?? '' });
+                    setRow(i, { productId: e.target.value, name: p?.name ?? '', format: p?.format ?? '60x60' });
                   }}
                 >
                   <option value="">Выберите номенклатуру</option>
                   {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
-              <input className="input w-20" type="number" min={1} value={r.quantity} onChange={(e) => setRow(i, { quantity: Number(e.target.value) })} />
-              <input className="input w-28" type="number" min={0} value={r.price} onChange={(e) => setRow(i, { price: Number(e.target.value) })} />
+              <input className="input w-24" placeholder="B, A3" value={r.toneCaliber ?? ''} onChange={(e) => setRow(i, { toneCaliber: e.target.value })} />
+              <input className="input w-20" type="number" min={0} step="0.001" value={r.quantity} onChange={(e) => setRow(i, { quantity: Number(e.target.value) })} />
+              <input className="input w-24" type="number" min={0} value={r.price} onChange={(e) => setRow(i, { price: Number(e.target.value) })} />
+              {/* Сумма считается автоматически, но её можно переписать вручную. */}
+              <input
+                className="input w-28"
+                type="number"
+                min={0}
+                value={r.sum ?? Math.round(r.quantity * r.price * 100) / 100}
+                onChange={(e) => setRow(i, { sum: Number(e.target.value) })}
+              />
               <button className="btn-ghost px-2 py-2" onClick={() => setRows((rs) => rs.filter((_, idx) => idx !== i))}><Trash2 size={15} /></button>
             </div>
           ))}
-          <button className="btn-soft text-xs" onClick={() => setRows((rs) => [...rs, { productId: '', name: '', quantity: 1, price: 0 }])}>
+          <button
+            className="btn-soft text-xs"
+            onClick={() => setRows((rs) => [...rs, { productId: '', name: '', format: '60x60', toneCaliber: '', quantity: 1, price: 0 }])}
+          >
             <Plus size={14} /> Добавить позицию
           </button>
         </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Field label="Условия поставки">
+            <input className="input" value={deliveryTerms} onChange={(e) => setDeliveryTerms(e.target.value)} placeholder="Самовывоз DAP до станции Костанай" />
+          </Field>
+          <Field label="Сроки отгрузки">
+            <input className="input" value={shipmentTerms} onChange={(e) => setShipmentTerms(e.target.value)} placeholder="14 календарных дней" />
+          </Field>
+          <Field label="Условия оплаты">
+            <input className="input" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="60 дней отсрочка платежа" />
+          </Field>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-slate-200">
+          <input type="checkbox" checked={includesVat} onChange={(e) => setIncludesVat(e.target.checked)} className="h-4 w-4 accent-[#A855F7]" />
+          Сумма включает НДС
+        </label>
+
         <div className="flex justify-end border-t border-border pt-3 text-sm">
           <span className="text-muted">Итого:&nbsp;</span><span className="font-bold text-white">{fmtMoney(total)}</span>
         </div>

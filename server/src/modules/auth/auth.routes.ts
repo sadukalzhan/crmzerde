@@ -14,8 +14,16 @@ const registerSchema = z.object({
   password: z.string().min(6, 'Минимум 6 символов'),
   companyName: z.string().min(2),
   phone: z.string().optional(),
+  // Реквизиты дилера — из них собирается спецификация, поэтому собираем сразу.
   bin: z.string().optional(),
   address: z.string().optional(),
+  actualAddress: z.string().optional(),
+  bankName: z.string().optional(),
+  bankAccount: z.string().optional(),
+  bik: z.string().optional(),
+  vatCert: z.string().optional(),
+  kbe: z.string().optional(),
+  director: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -32,7 +40,7 @@ router.post(
   '/register',
   validateBody(registerSchema),
   asyncHandler(async (req, res) => {
-    const { fullName, email, password, companyName, phone, bin, address } = req.body;
+    const { fullName, email, password, companyName, phone, ...requisites } = req.body;
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) throw conflict('Пользователь с таким email уже существует');
 
@@ -43,7 +51,7 @@ router.post(
         passwordHash: await hashPassword(password),
         role: 'CLIENT',
         phone,
-        clientProfile: { create: { companyName, contactName: fullName, email, phone, bin, address } },
+        clientProfile: { create: { companyName, contactName: fullName, email, phone, ...requisites } },
       },
     });
 

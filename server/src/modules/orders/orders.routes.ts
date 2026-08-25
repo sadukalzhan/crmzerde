@@ -24,7 +24,7 @@ const createSchema = z.object({
       z.object({
         productId: z.string(),
         quantity: z.number().positive(),
-        grade: z.enum(['A', 'B', 'C', 'BRAK']).optional(),
+        grade: z.string().optional(),
       }),
     )
     .min(1, 'Добавьте хотя бы одну позицию'),

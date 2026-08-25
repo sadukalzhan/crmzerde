@@ -8,6 +8,7 @@ import { validateBody } from '../../middleware/validate';
 import { asyncHandler, badRequest } from '../../middleware/error';
 import { upload, deleteFile } from '../../lib/storage';
 import { boxes, pallets, FORMAT_LABELS, GRADE_LABELS } from '../../domain/packaging';
+import { activeGradeCodes, gradeLabels } from '../../lib/grades';
 
 const router = Router();
 router.use(authenticate);
@@ -87,6 +88,8 @@ router.get(
       where: { isActive: true },
       orderBy: { name: 'asc' },
     });
+    const codes = await activeGradeCodes();
+    const labels = await gradeLabels();
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Остатки');
@@ -98,11 +101,11 @@ router.get(
     ];
     ws.getRow(1).font = { bold: true };
     for (const p of products) {
-      for (const grade of ['A', 'B', 'C', 'BRAK']) {
+      for (const grade of codes) {
         ws.addRow({
           name: p.name,
           format: FORMAT_LABELS[p.format] ?? p.format,
-          grade: GRADE_LABELS[grade] ?? grade,
+          grade: labels[grade] ?? grade,
           quantity: 0,
         });
       }
@@ -199,7 +202,7 @@ router.patch(
 router.post(
   '/adjust',
   requireRole('WAREHOUSE'),
-  validateBody(z.object({ productId: z.string(), grade: z.enum(['A', 'B', 'C', 'BRAK']).default('A'), delta: z.number() })),
+  validateBody(z.object({ productId: z.string(), grade: z.string().default('A'), delta: z.number() })),
   asyncHandler(async (req, res) => {
     const { productId, grade, delta } = req.body;
     const inv = await prisma.inventory.upsert({

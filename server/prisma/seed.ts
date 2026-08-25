@@ -32,6 +32,7 @@ async function reset() {
   await prisma.client.deleteMany();
   await prisma.user.deleteMany();
   await prisma.carrier.deleteMany();
+  await prisma.grade.deleteMany();
   await prisma.setting.deleteMany();
 }
 
@@ -60,6 +61,18 @@ async function main() {
 
   // Справочники
   console.log('Справочники…');
+  // Сорта: пишутся не только как «A»/«B», но и как «A1», «R3», «B12».
+  await prisma.grade.createMany({
+    data: [
+      { code: 'A', label: 'A сорт', sortOrder: 1 },
+      { code: 'A1', label: 'A1', sortOrder: 2 },
+      { code: 'R3', label: 'R3', sortOrder: 3 },
+      { code: 'B', label: 'B сорт', sortOrder: 4 },
+      { code: 'B12', label: 'B12', sortOrder: 5 },
+      { code: 'C', label: 'C сорт', noBox: true, sortOrder: 6 },
+      { code: 'BRAK', label: 'Брак', noBox: true, sortOrder: 7 },
+    ],
+  });
   await prisma.carrier.createMany({
     data: [
       { name: 'КазТрансЛогистик', phone: '+7 727 300 10 10' },
@@ -77,6 +90,12 @@ async function main() {
       phone: '+7 707 555 44 33',
       bin: '050340001234',
       address: 'г. Алматы, ул. Райымбека 220',
+      actualAddress: 'г. Алматы, ул. Райымбека 220',
+      bankName: 'АО «Kaspi Bank»',
+      bankAccount: 'KZ09722S000006638360',
+      bik: 'CASPKZKA',
+      kbe: '17',
+      director: 'Сапарова Ж. К.',
       managerId: manager.id,
       userId: clientUser.id,
     },
@@ -86,7 +105,7 @@ async function main() {
   console.log('Номенклатура…');
   // Остатки нулевые (админ заливает импортом), цен у номенклатуры нет —
   // цена появляется только в спецификации на этапе согласования.
-  const GRADES = ['A', 'B', 'C', 'BRAK'] as const;
+  const GRADES = ['A', 'A1', 'R3', 'B', 'B12', 'C', 'BRAK'] as const;
   const products = [
     { name: 'Cemento Ivory', format: '60x60', collection: 'Cemento', color: 'Ivory' },
     { name: 'Marmo Statuario', format: '120x60', collection: 'Marmo', color: 'Белый' },

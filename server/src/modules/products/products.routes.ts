@@ -5,7 +5,7 @@ import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validateBody } from '../../middleware/validate';
 import { asyncHandler } from '../../middleware/error';
-import { GRADES } from '../../domain/packaging';
+import { emptyInventoryRows } from '../../lib/grades';
 
 const router = Router();
 router.use(authenticate);
@@ -42,7 +42,7 @@ router.post(
         ...req.body,
         unit: 'M2',
         // По строке склада на каждый сорт (A/B/C/BRAK), начальный остаток 0.
-        inventory: { create: GRADES.map((grade) => ({ grade, quantity: 0, reserved: 0, unit: 'M2' })) },
+        inventory: { create: await emptyInventoryRows() },
       },
       include: { inventory: true },
     });

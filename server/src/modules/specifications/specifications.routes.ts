@@ -4,7 +4,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validateBody } from '../../middleware/validate';
-import { asyncHandler, forbidden } from '../../middleware/error';
+import { ApiError, asyncHandler, forbidden } from '../../middleware/error';
 import { notify } from '../../lib/notify';
 import { renderPdf } from '../../lib/pdf';
 import { buildSpecificationPdf } from './specification.pdf';
@@ -187,23 +187,31 @@ router.get(
     });
     await assertOrderAccess(spec.orderId, req.user!.id, req.user!.role);
 
-    const pdf = await renderPdf(
-      buildSpecificationPdf({
-        number: spec.number,
-        contractNumber: spec.contractNumber,
-        contractDate: spec.contractDate,
-        city: spec.city,
-        issuedAt: spec.issuedAt,
-        currency: spec.currency,
-        includesVat: spec.includesVat,
-        deliveryTerms: spec.deliveryTerms,
-        shipmentTerms: spec.shipmentTerms,
-        paymentTerms: spec.paymentTerms,
-        total: spec.total,
-        items: spec.items,
-        dealer: spec.order.client,
-      }),
-    );
+    // Причину сбоя показываем в ответе: это внутренний инструмент, и «внутренняя
+    // ошибка сервера» без деталей не даёт менеджеру понять, что не так.
+    let pdf: Buffer;
+    try {
+      pdf = await renderPdf(
+        buildSpecificationPdf({
+          number: spec.number,
+          contractNumber: spec.contractNumber,
+          contractDate: spec.contractDate,
+          city: spec.city,
+          issuedAt: spec.issuedAt,
+          currency: spec.currency,
+          includesVat: spec.includesVat,
+          deliveryTerms: spec.deliveryTerms,
+          shipmentTerms: spec.shipmentTerms,
+          paymentTerms: spec.paymentTerms,
+          total: spec.total,
+          items: spec.items,
+            dealer: spec.order.client,
+          }),
+        );
+    } catch (err) {
+      console.error('[SPEC PDF]', err);
+      throw new ApiError(500, `Не удалось сформировать PDF: ${(err as Error)?.message ?? String(err)}`);
+    }
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="specification-${spec.number}.pdf"`);

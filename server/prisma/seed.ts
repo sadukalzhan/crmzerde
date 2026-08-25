@@ -5,12 +5,13 @@
 // Демо-заявок нет.
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { SEED_VERSION } from './seed-version';
 
 const prisma = new PrismaClient();
 const hash = (p: string) => bcrypt.hashSync(p, 10);
 
 // Версия сида — при её смене seed-if-needed один раз пересоздаёт базу.
-export const SEED_VERSION = '3';
+export { SEED_VERSION } from './seed-version';
 
 async function reset() {
   await prisma.notification.deleteMany();

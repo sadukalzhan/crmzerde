@@ -1,10 +1,11 @@
-// Применяет сид один раз на версию. Если Setting.seedVersion уже равен EXPECTED —
-// пропускает (данные не трогает). Иначе выполняет сброс-сид (prisma/seed.ts).
+// Применяет сид один раз на версию. Если Setting.seedVersion уже равен ожидаемой
+// версии — пропускает (данные не трогает). Иначе выполняет сброс-сид (prisma/seed.ts).
 // Позволяет один раз пересоздать базу на Render при смене модели данных.
+// Версия берётся из общего модуля: раньше она дублировалась здесь и разъезжалась
+// с seed.ts, из-за чего сид молча не запускался.
 import { PrismaClient } from '@prisma/client';
 import { execSync } from 'child_process';
-
-const EXPECTED = '2';
+import { SEED_VERSION as EXPECTED } from '../prisma/seed-version';
 
 (async () => {
   const prisma = new PrismaClient();

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import ExcelJS from 'exceljs';
 import { prisma } from '../../lib/prisma';
+import { attachment } from '../../lib/download';
 import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validateBody } from '../../middleware/validate';
@@ -111,8 +112,8 @@ const TEMPLATE_COLUMNS: Record<RefKind, { header: string; width: number }[]> = {
 };
 
 const TEMPLATE_FILES: Record<RefKind, string> = {
-  products: 'nomenklatura-shablon.xlsx',
-  carriers: 'perevozchiki-shablon.xlsx',
+  products: 'Шаблон номенклатуры.xlsx',
+  carriers: 'Шаблон перевозчиков.xlsx',
 };
 
 router.get(
@@ -129,7 +130,7 @@ router.get(
     ws.getRow(1).font = { bold: true };
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${TEMPLATE_FILES[kind]}"`);
+    res.setHeader('Content-Disposition', attachment(TEMPLATE_FILES[kind]));
     await wb.xlsx.write(res);
     res.end();
   }),

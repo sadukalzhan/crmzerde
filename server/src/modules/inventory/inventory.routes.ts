@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import ExcelJS from 'exceljs';
 import { prisma } from '../../lib/prisma';
+import { attachment } from '../../lib/download';
 import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validateBody } from '../../middleware/validate';
@@ -71,7 +72,7 @@ router.get(
       });
     }
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="ostatki-sklada.xlsx"');
+    res.setHeader('Content-Disposition', attachment('Остатки склада.xlsx'));
     await wb.xlsx.write(res);
     res.end();
   }),
@@ -112,7 +113,7 @@ router.get(
     }
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="ostatki-shablon.xlsx"');
+    res.setHeader('Content-Disposition', attachment('Шаблон остатков.xlsx'));
     await wb.xlsx.write(res);
     res.end();
   }),

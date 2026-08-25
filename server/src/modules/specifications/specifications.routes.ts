@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { attachment } from '../../lib/download';
 import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validateBody } from '../../middleware/validate';
@@ -214,7 +215,7 @@ router.get(
     }
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="specification-${spec.number}.pdf"`);
+    res.setHeader('Content-Disposition', attachment(`Спецификация ${spec.number}.pdf`));
     res.send(pdf);
   }),
 );

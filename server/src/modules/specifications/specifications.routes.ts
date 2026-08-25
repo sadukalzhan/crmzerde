@@ -205,9 +205,9 @@ router.get(
           paymentTerms: spec.paymentTerms,
           total: spec.total,
           items: spec.items,
-            dealer: spec.order.client,
-          }),
-        );
+          dealer: spec.order.client,
+        }),
+      );
     } catch (err) {
       console.error('[SPEC PDF]', err);
       throw new ApiError(500, `Не удалось сформировать PDF: ${(err as Error)?.message ?? String(err)}`);

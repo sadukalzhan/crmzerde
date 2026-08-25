@@ -61,7 +61,11 @@ export function createApp() {
       }
     }
 
-    res.json({ ok: true, db, ...(dbError ? { dbError } : {}), ...(pdf ? { pdf } : {}), ts: Date.now() });
+    // Какой коммит реально запущен — Render кладёт его в окружение.
+    // Без этого невозможно отличить «правка не работает» от «сборка не доехала».
+    const commit = process.env.RENDER_GIT_COMMIT?.slice(0, 7);
+
+    res.json({ ok: true, commit, db, ...(dbError ? { dbError } : {}), ...(pdf ? { pdf } : {}), ts: Date.now() });
   });
 
   app.use('/api/auth', authRoutes);

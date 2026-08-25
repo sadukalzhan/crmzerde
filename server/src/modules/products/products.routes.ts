@@ -5,7 +5,6 @@ import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validateBody } from '../../middleware/validate';
 import { asyncHandler } from '../../middleware/error';
-import { emptyInventoryRows } from '../../lib/grades';
 
 const router = Router();
 router.use(authenticate);
@@ -38,12 +37,9 @@ router.post(
   validateBody(productSchema),
   asyncHandler(async (req, res) => {
     const product = await prisma.product.create({
-      data: {
-        ...req.body,
-        unit: 'M2',
-        // По строке склада на каждый сорт (A/B/C/BRAK), начальный остаток 0.
-        inventory: { create: await emptyInventoryRows() },
-      },
+      // Строки склада не создаём заранее: сорта приходят вместе с остатками
+      // из 1С, где у каждого товара свой набор («A, R3, 0», «B, 0» и т. д.).
+      data: { ...req.body, unit: 'M2' },
       include: { inventory: true },
     });
     res.status(201).json(product);

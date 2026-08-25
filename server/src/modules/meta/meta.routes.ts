@@ -11,8 +11,6 @@ import {
   FORMATS,
   FORMAT_LABELS,
   FORMAT_SPECS,
-  GRADES,
-  GRADE_LABELS,
 } from '../../domain/packaging';
 
 const router = Router();
@@ -31,8 +29,6 @@ router.get('/', (_req, res) => {
     formats: FORMATS,
     formatLabels: FORMAT_LABELS,
     formatSpecs: FORMAT_SPECS,
-    grades: GRADES,
-    gradeLabels: GRADE_LABELS,
     documentTypes: {
       TTN: 'ТТН',
       UPD: 'УПД',

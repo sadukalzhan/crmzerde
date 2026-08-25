@@ -17,7 +17,7 @@ import {
 import { api, apiError, fileHref } from '../lib/api';
 import { toast } from '../components/toast';
 import { fmtDate, fmtDateTime, fmtMoney, fmtM2 } from '../lib/format';
-import { boxes, pallets, GRADE_LABELS } from '../lib/packaging';
+import { boxes, pallets } from '../lib/packaging';
 import { useAuth } from '../lib/store';
 import { cn } from '../lib/cn';
 import { useQueryClient } from '@tanstack/react-query';
@@ -181,7 +181,7 @@ export default function OrderDetailPage() {
                     return (
                       <tr key={it.id}>
                         <td className="py-2.5 pr-4 text-slate-200">{it.product?.name ?? '—'}</td>
-                        <td className="py-2.5 pr-4 text-muted">{GRADE_LABELS[it.grade] ?? it.grade}</td>
+                        <td className="py-2.5 pr-4 text-muted">{it.grade}</td>
                         <td className="py-2.5 pr-4 text-muted">
                           {fmtM2(it.quantity)} · {boxes(it.quantity, fmt, it.grade)} кор. · {pallets(it.quantity, fmt, it.grade)} под.
                         </td>
@@ -222,7 +222,7 @@ export default function OrderDetailPage() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <div className="text-sm font-medium text-slate-100">{line.name}</div>
-                        <div className="text-xs text-muted">{GRADE_LABELS[line.grade] ?? line.grade}</div>
+                        <div className="text-xs text-muted">{line.grade}</div>
                       </div>
                       <div className="flex gap-4 text-xs">
                         <span className="text-muted">Нужно: <b className="text-slate-200">{fmtM2(line.needed)}</b></span>

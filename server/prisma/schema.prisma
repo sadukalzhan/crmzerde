@@ -113,17 +113,6 @@ model Product {
   reservations       Reservation[]
 }
 
-// Справочник сортов. Сорт пишется не только как «A» или «B», но и как
-// «A1», «R3», «B12» — поэтому список ведётся в справочнике, а не в коде.
-model Grade {
-  id        String  @id @default(cuid())
-  code      String  @unique // A | A1 | R3 | B | B12 | C | BRAK
-  label     String // как показывать: «A сорт», «Брак»
-  noBox     Boolean @default(false) // отгружается без коробок (C, брак)
-  sortOrder Int     @default(0)
-  isActive  Boolean @default(true)
-}
-
 model Carrier {
   id       String  @id @default(cuid())
   name     String
@@ -329,7 +318,9 @@ model Inventory {
   id        String   @id @default(cuid())
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  grade     String   @default("A") // A | B | C | BRAK
+  // Сорт как в 1С — свободная строка: «A, R3, 0», «B, B4/BI, R3», «B, A4/N».
+  // Товар лежит на складе несколькими строками, по одной на сорт.
+  grade     String   @default("A")
   quantity  Float    @default(0) // м²
   reserved  Float    @default(0) // м²
   unit      String   @default("M2")

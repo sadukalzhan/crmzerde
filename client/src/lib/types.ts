@@ -44,14 +44,6 @@ export type Unit = 'M2' | 'PALLET';
 // Сорт — свободный код из справочника: A, A1, R3, B, B12, C, BRAK и другие.
 export type Grade = string;
 
-export interface GradeRef {
-  id: string;
-  code: string;
-  label: string;
-  noBox: boolean;
-  sortOrder: number;
-  isActive: boolean;
-}
 export type Format = '60x60' | '120x60';
 
 export interface User {

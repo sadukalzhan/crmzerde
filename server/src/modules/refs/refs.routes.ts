@@ -9,45 +9,9 @@ import { validateBody } from '../../middleware/validate';
 import { asyncHandler, badRequest } from '../../middleware/error';
 import { upload, deleteFile } from '../../lib/storage';
 import { isFormat } from '../../domain/packaging';
-import { emptyInventoryRows } from '../../lib/grades';
 
 const router = Router();
 router.use(authenticate);
-
-// ── Сорта ──
-// Сорт пишется не только как «A» или «B», но и как «A1», «R3», «B12»,
-// поэтому список ведётся здесь, а не зашит в коде.
-router.get(
-  '/grades',
-  asyncHandler(async (_req, res) => {
-    res.json(await prisma.grade.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] }));
-  }),
-);
-
-const gradeSchema = z.object({
-  code: z.string().min(1).max(12),
-  label: z.string().min(1),
-  noBox: z.boolean().optional(),
-  sortOrder: z.number().int().optional(),
-});
-
-router.post(
-  '/grades',
-  requireRole('ADMIN'),
-  validateBody(gradeSchema),
-  asyncHandler(async (req, res) => {
-    res.status(201).json(await prisma.grade.create({ data: req.body }));
-  }),
-);
-
-router.patch(
-  '/grades/:id',
-  requireRole('ADMIN'),
-  validateBody(gradeSchema.partial().extend({ isActive: z.boolean().optional() })),
-  asyncHandler(async (req, res) => {
-    res.json(await prisma.grade.update({ where: { id: req.params.id }, data: req.body }));
-  }),
-);
 
 // ── Перевозчики ──
 router.get(
@@ -190,7 +154,6 @@ router.post(
                 unit: 'M2',
                 // Строка склада на каждый сорт с нулевым остатком — как при
                 // создании товара вручную, иначе импорт остатков не найдёт пару.
-                inventory: { create: await emptyInventoryRows() },
               },
             });
             created++;

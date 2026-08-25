@@ -4,7 +4,7 @@ import { PageLoader, EmptyState } from '../components/ui';
 import { StatusBadge } from '../components/badges';
 import { useReservations } from '../lib/queries';
 import { fmtM2, fmtDate } from '../lib/format';
-import { FORMAT_LABELS, GRADE_LABELS } from '../lib/packaging';
+import { FORMAT_LABELS } from '../lib/packaging';
 
 export default function ReservationsPage() {
   const { data: reservations = [], isLoading } = useReservations();
@@ -54,7 +54,7 @@ export default function ReservationsPage() {
                     <td className="px-4 py-3 text-muted">{r.createdBy?.fullName ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-200">{r.product?.name ?? '—'}</td>
                     <td className="px-4 py-3 text-muted">{FORMAT_LABELS[r.product?.format ?? ''] ?? r.product?.format}</td>
-                    <td className="px-4 py-3 text-muted">{GRADE_LABELS[r.grade] ?? r.grade}</td>
+                    <td className="px-4 py-3 text-muted">{r.grade}</td>
                     <td className="px-4 py-3 text-right font-medium text-amber-300">{fmtM2(r.quantity)}</td>
                     <td className="px-4 py-3 text-right text-muted">{r.boxes ?? 0}</td>
                     <td className="px-4 py-3 text-right text-muted">{r.pallets ?? 0}</td>

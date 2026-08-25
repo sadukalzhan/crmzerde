@@ -32,7 +32,6 @@ async function reset() {
   await prisma.client.deleteMany();
   await prisma.user.deleteMany();
   await prisma.carrier.deleteMany();
-  await prisma.grade.deleteMany();
   await prisma.setting.deleteMany();
 }
 
@@ -61,18 +60,6 @@ async function main() {
 
   // Справочники
   console.log('Справочники…');
-  // Сорта: пишутся не только как «A»/«B», но и как «A1», «R3», «B12».
-  await prisma.grade.createMany({
-    data: [
-      { code: 'A', label: 'A сорт', sortOrder: 1 },
-      { code: 'A1', label: 'A1', sortOrder: 2 },
-      { code: 'R3', label: 'R3', sortOrder: 3 },
-      { code: 'B', label: 'B сорт', sortOrder: 4 },
-      { code: 'B12', label: 'B12', sortOrder: 5 },
-      { code: 'C', label: 'C сорт', noBox: true, sortOrder: 6 },
-      { code: 'BRAK', label: 'Брак', noBox: true, sortOrder: 7 },
-    ],
-  });
   await prisma.carrier.createMany({
     data: [
       { name: 'КазТрансЛогистик', phone: '+7 727 300 10 10' },
@@ -103,9 +90,9 @@ async function main() {
 
   // Примерные товары в новой модели + остатки по сортам (м²)
   console.log('Номенклатура…');
-  // Остатки нулевые (админ заливает импортом), цен у номенклатуры нет —
-  // цена появляется только в спецификации на этапе согласования.
-  const GRADES = ['A', 'A1', 'R3', 'B', 'B12', 'C', 'BRAK'] as const;
+  // Строк склада не создаём: сорта приходят вместе с остатками из 1С
+  // («A, R3, 0», «B, 0» и т. д.). Цен у номенклатуры нет — цена появляется
+  // только в спецификации на этапе согласования.
   const products = [
     { name: 'Cemento Ivory', format: '60x60', collection: 'Cemento', color: 'Ivory' },
     { name: 'Marmo Statuario', format: '120x60', collection: 'Marmo', color: 'Белый' },
@@ -120,9 +107,6 @@ async function main() {
         collection: p.collection,
         color: p.color,
         unit: 'M2',
-        inventory: {
-          create: GRADES.map((grade) => ({ grade, quantity: 0, reserved: 0, unit: 'M2' })),
-        },
       },
     });
   }
@@ -130,7 +114,7 @@ async function main() {
   console.log('\n✅ База очищена и подготовлена. Тестовые учётки:');
   console.log('  admin@crm.kz / admin123 · head@crm.kz / head123 · manager@crm.kz / manager123');
   console.log('  warehouse@crm.kz / warehouse123 · client@crm.kz / client123');
-  console.log('  Остатки нулевые — залейте актуальные импортом из Excel.\n');
+  console.log('  Остатки и сорта загружаются импортом выгрузки из 1С.\n');
 }
 
 main()

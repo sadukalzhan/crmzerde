@@ -7,7 +7,7 @@ import { useInventory } from '../lib/queries';
 import { api, apiError } from '../lib/api';
 import { toast } from '../components/toast';
 import { fmtM2 } from '../lib/format';
-import { FORMAT_LABELS, GRADE_LABELS } from '../lib/packaging';
+import { FORMAT_LABELS } from '../lib/packaging';
 import { useAuth } from '../lib/store';
 import { cn } from '../lib/cn';
 import type { Inventory } from '../lib/types';
@@ -145,7 +145,7 @@ export default function InventoryPage() {
                       <td className="px-4 py-3 text-muted">{FORMAT_LABELS[inv.product?.format ?? ''] ?? inv.product?.format}</td>
                       <td className="px-4 py-3">
                         <span className={cn('chip text-[11px] font-semibold', GRADE_CLASS[inv.grade] ?? 'bg-slate-500/15 text-muted')}>
-                          {GRADE_LABELS[inv.grade] ?? inv.grade}
+                          {inv.grade}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-slate-100">{fmtM2(inv.quantity)}</td>
@@ -170,7 +170,7 @@ export default function InventoryPage() {
       <Modal
         open={!!adjust}
         onClose={() => setAdjust(null)}
-        title={`Корректировка: ${adjust?.product?.name ?? ''} · ${GRADE_LABELS[adjust?.grade ?? 'A']}`}
+        title={`Корректировка: ${adjust?.product?.name ?? ''} · ${adjust?.grade ?? ''}`}
         footer={
           <>
             <button className="btn-ghost" onClick={() => setAdjust(null)}>Отмена</button>

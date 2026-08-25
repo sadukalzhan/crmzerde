@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
 import type {
   AppSettings,
-  GradeRef,
   Availability,
   Claim,
   Client,
@@ -177,9 +176,6 @@ export const useClients = (opts?: { enabled?: boolean }) =>
 export const useUsers = () =>
   useQuery({ queryKey: ['users'], queryFn: async () => (await api.get<User[]>('/users')).data });
 
-
-export const useGrades = () =>
-  useQuery({ queryKey: ['grades'], queryFn: async () => (await api.get<GradeRef[]>('/refs/grades')).data });
 
 export const useCarriers = () =>
   useQuery({ queryKey: ['carriers'], queryFn: async () => (await api.get<Carrier[]>('/refs/carriers')).data });

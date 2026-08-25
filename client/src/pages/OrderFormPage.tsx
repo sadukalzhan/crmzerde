@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, PackagePlus } from 'lucide-react';
 import { Page, PageHeader } from '../components/PageHeader';
 import { Field } from '../components/ui';
-import { useProducts, useClients, useCarriers, useGrades, useCreateOrder } from '../lib/queries';
+import { useProducts, useClients, useCarriers, useCreateOrder } from '../lib/queries';
 import { fmtMoney, fmtM2 } from '../lib/format';
 import { boxes, pallets } from '../lib/packaging';
 import { apiError } from '../lib/api';
@@ -21,7 +21,6 @@ export default function OrderFormPage() {
   const { data: clients = [] } = useClients({ enabled: !isClient });
   const { data: carriers = [] } = useCarriers();
   // Сорта берём из справочника: список пополняется без правки кода.
-  const { data: grades = [] } = useGrades();
   const createOrder = useCreateOrder();
 
   const [clientId, setClientId] = useState('');
@@ -31,6 +30,14 @@ export default function OrderFormPage() {
   const [shipTo, setShipTo] = useState('');
   const [desiredDate, setDesiredDate] = useState('');
   const [rows, setRows] = useState<ItemRow[]>([{ productId: '', quantity: 1, grade: 'A' }]);
+
+  /** Сорта выбранного товара с остатком — источник правды это склад. */
+  const gradesOf = (productId: string) => {
+    const p = products.find((x) => x.id === productId);
+    return (p?.inventory ?? [])
+      .map((inv) => ({ grade: inv.grade, free: inv.quantity - inv.reserved }))
+      .sort((a, b) => b.free - a.free);
+  };
 
   const setRow = (i: number, patch: Partial<ItemRow>) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   // Завод один — город отгрузки постоянный.
@@ -91,16 +98,21 @@ export default function OrderFormPage() {
                   <div key={i} className="rounded-lg border border-border bg-bg-elevated p-3">
                     <div className="flex items-end gap-2">
                       <div className="flex-1">
-                        <select className="input" value={r.productId} onChange={(e) => setRow(i, { productId: e.target.value })}>
+                        <select className="input" value={r.productId} onChange={(e) => setRow(i, { grade: gradesOf(e.target.value)[0]?.grade ?? 'A', productId: e.target.value })}>
                           <option value="">Выберите товар…</option>
                           {products.map((op) => (
                             <option key={op.id} value={op.id}>{op.name} ({op.format?.replace('x', '×')})</option>
                           ))}
                         </select>
                       </div>
-                      <div className="w-28">
+                      <div className="w-40">
+                        {/* Сорта у каждого товара свои — берём те, что реально
+                            лежат на складе по этой позиции. */}
                         <select className="input" value={r.grade} onChange={(e) => setRow(i, { grade: e.target.value })}>
-                          {grades.map((g) => <option key={g.code} value={g.code}>{g.label}</option>)}
+                          {gradesOf(r.productId).length === 0 && <option value="">— нет на складе —</option>}
+                          {gradesOf(r.productId).map((g) => (
+                            <option key={g.grade} value={g.grade}>{g.grade} · {fmtM2(g.free)}</option>
+                          ))}
                         </select>
                       </div>
                       <div className="w-24">

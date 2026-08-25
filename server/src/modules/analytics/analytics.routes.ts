@@ -6,7 +6,7 @@ import { asyncHandler } from '../../middleware/error';
 import { ORDER_STATUSES } from '../../domain/orderStatus';
 
 const router = Router();
-router.use(authenticate, requireRole('MANAGER', 'ACCOUNTANT', 'FACTORY', 'WAREHOUSE', 'LOGIST'));
+router.use(authenticate, requireRole('MANAGER', 'SALES_HEAD', 'WAREHOUSE'));
 
 // Сводка для дашборда.
 router.get(

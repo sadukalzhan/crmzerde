@@ -25,7 +25,7 @@ model User {
   fullName     String
   email        String   @unique
   passwordHash String
-  role         String // ADMIN | MANAGER | FACTORY | WAREHOUSE | LOGIST | ACCOUNTANT | CLIENT
+  role         String // ADMIN | SALES_HEAD | MANAGER | WAREHOUSE | CLIENT
   phone        String?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
@@ -61,15 +61,15 @@ model PasswordResetToken {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Client {
-  id           String   @id @default(cuid())
-  companyName  String
-  contactName  String?
-  email        String?
-  phone        String?
-  bin          String? // БИН/ИНН — реквизиты
-  address      String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(cuid())
+  companyName String
+  contactName String?
+  email       String?
+  phone       String?
+  bin         String? // БИН/ИНН — реквизиты
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Аккаунт-логин клиента (роль CLIENT), один-к-одному
   userId String? @unique
@@ -84,7 +84,8 @@ model Client {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Справочники: номенклатура, заводы, перевозчики
+// Справочники: номенклатура, перевозчики
+// (завод один, поэтому отдельного справочника заводов нет)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Product {
@@ -94,7 +95,6 @@ model Product {
   size         String? // legacy / произвольный размер
   collection   String? // «Cemento»
   color        String? // цвет
-  surface      String? // технология / поверхность
   unit         String   @default("M2") // базовая единица — м²
   pricePerUnit Float    @default(0) // цена за м²
   isActive     Boolean  @default(true)
@@ -104,15 +104,6 @@ model Product {
   orderItems         OrderItem[]
   specificationItems SpecificationItem[]
   reservations       Reservation[]
-}
-
-model Factory {
-  id       String  @id @default(cuid())
-  name     String
-  city     String
-  isActive Boolean @default(true)
-
-  orders Order[]
 }
 
 model Carrier {
@@ -132,8 +123,8 @@ model Order {
   id     String @id @default(cuid())
   number Int    @unique // отображается как #233
 
-  status   String  @default("NEW") // см. src/domain/orderStatus.ts
-  priority String  @default("MEDIUM") // HIGH | MEDIUM | LOW
+  status   String @default("NEW") // см. src/domain/orderStatus.ts
+  priority String @default("MEDIUM") // HIGH | MEDIUM | LOW
 
   // Производственный приоритет: 1 (аванс) выше 2 (постоплата)
   productionPriority Int?
@@ -146,7 +137,7 @@ model Order {
   unit     String @default("M2")
 
   selfPickup Boolean @default(false) // самовывоз (без перевозчика)
-  shipFrom   String? // завод-отгрузка, «Актобе»
+  shipFrom   String? // город отгрузки (завод один — «Актобе»)
   shipTo     String? // «Москва-Бронницы»
   route      String? // «Актобе → Москва-Бронницы»
 
@@ -172,9 +163,6 @@ model Order {
 
   closedById String?
   closedBy   User?   @relation("OrderCloser", fields: [closedById], references: [id])
-
-  factoryId String?
-  factory   Factory? @relation(fields: [factoryId], references: [id])
 
   carrierId String?
   carrier   Carrier? @relation(fields: [carrierId], references: [id])
@@ -213,17 +201,17 @@ model OrderItem {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Specification {
-  id             String   @id @default(cuid())
-  orderId        String
-  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  number         String
-  fileUrl        String?
-  total          Float    @default(0)
-  managerSigned  Boolean  @default(false)
+  id              String    @id @default(cuid())
+  orderId         String
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  number          String
+  fileUrl         String?
+  total           Float     @default(0)
+  managerSigned   Boolean   @default(false)
   managerSignedAt DateTime?
-  clientSigned   Boolean  @default(false)
-  clientSignedAt DateTime?
-  createdAt      DateTime @default(now())
+  clientSigned    Boolean   @default(false)
+  clientSignedAt  DateTime?
+  createdAt       DateTime  @default(now())
 
   items SpecificationItem[]
 }
@@ -281,11 +269,11 @@ model ProductionPlan {
 }
 
 model ProductionPlanItem {
-  id        String   @id @default(cuid())
-  planId    String
-  plan      ProductionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-  orderId   String
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id      String         @id @default(cuid())
+  planId  String
+  plan    ProductionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  orderId String
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   // Конкретная позиция заявки (товар+сорт), которую производим (может быть несколько на заявку)
   orderItemId String?
@@ -293,16 +281,16 @@ model ProductionPlanItem {
   grade       String     @default("A")
   quantity    Float      @default(0) // объём в производство (нехватка), м²
 
-  priority  Int      @default(2) // 1 = аванс (первая очередь), 2 = постоплата
-  status    String   @default("PLANNED") // PLANNED | IN_PRODUCTION | PRODUCED | TRANSFERRED
+  priority  Int       @default(2) // 1 = аванс (первая очередь), 2 = постоплата
+  status    String    @default("PLANNED") // PLANNED | IN_PRODUCTION | PRODUCED | TRANSFERRED
   startDate DateTime? // дата начала производства (правило 15-го числа)
   endDate   DateTime? // дата окончания производства
 
   // Фактический выпуск по сортам (м²)
-  gradeA    Float  @default(0)
-  gradeB    Float  @default(0)
-  gradeC    Float  @default(0)
-  gradeBrak Float  @default(0)
+  gradeA    Float @default(0)
+  gradeB    Float @default(0)
+  gradeC    Float @default(0)
+  gradeBrak Float @default(0)
 
   customsDate DateTime? // таможенная очистка
   comments    String? // комментарии с производства
@@ -324,19 +312,19 @@ model Inventory {
 }
 
 model Reservation {
-  id          String   @id @default(cuid())
-  orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  grade       String   @default("A")
-  quantity    Float // м²
+  id                   String   @id @default(cuid())
+  orderId              String
+  order                Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId            String
+  product              Product  @relation(fields: [productId], references: [id])
+  grade                String   @default("A")
+  quantity             Float // м²
   // Резерв подтверждён под конкретную отгрузку — такой нельзя перебросить
   // на другую заявку того же клиента (Регламент, п. 4).
-  confirmedForShipment Boolean @default(false)
-  createdById String?
-  createdBy   User?    @relation("ReservationCreator", fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
+  confirmedForShipment Boolean  @default(false)
+  createdById          String?
+  createdBy            User?    @relation("ReservationCreator", fields: [createdById], references: [id])
+  createdAt            DateTime @default(now())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

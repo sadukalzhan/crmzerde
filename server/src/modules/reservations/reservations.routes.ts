@@ -14,7 +14,7 @@ router.use(authenticate);
 // Раздел резервов: кто, под какую заявку/клиента, какой товар и сорт зарезервировал.
 router.get(
   '/',
-  requireRole('WAREHOUSE', 'MANAGER', 'FACTORY', 'ACCOUNTANT'),
+  requireRole('WAREHOUSE', 'MANAGER', 'SALES_HEAD'),
   asyncHandler(async (_req, res) => {
     const rows = await prisma.reservation.findMany({
       include: {
@@ -45,7 +45,7 @@ router.get(
 // нельзя перебросить на другую заявку того же клиента.
 router.patch(
   '/:id/confirm',
-  requireRole('MANAGER', 'WAREHOUSE'),
+  requireRole('MANAGER', 'SALES_HEAD', 'WAREHOUSE'),
   validateBody(z.object({ confirmed: z.boolean() })),
   asyncHandler(async (req, res) => {
     res.json(await setReservationConfirmed(req.params.id, req.body.confirmed));

@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'MANAGER' | 'FACTORY' | 'WAREHOUSE' | 'LOGIST' | 'ACCOUNTANT' | 'CLIENT';
+export type Role = 'ADMIN' | 'SALES_HEAD' | 'MANAGER' | 'WAREHOUSE' | 'CLIENT';
 
 export type OrderStatus =
   | 'NEW'
@@ -84,7 +84,6 @@ export interface Product {
   size?: string | null;
   collection?: string | null;
   color?: string | null;
-  surface?: string | null;
   unit: Unit;
   pricePerUnit: number;
   isActive: boolean;
@@ -188,7 +187,6 @@ export interface Order {
   updatedAt: string;
   client: Client;
   manager?: { id: string; fullName: string; email: string; role: Role } | null;
-  factory?: { id: string; name: string; city: string } | null;
   carrier?: { id: string; name: string } | null;
   items: OrderItem[];
   specifications?: Specification[];
@@ -224,12 +222,6 @@ export interface Notification {
   createdAt: string;
 }
 
-export interface Factory {
-  id: string;
-  name: string;
-  city: string;
-  isActive: boolean;
-}
 export interface Carrier {
   id: string;
   name: string;
@@ -251,7 +243,6 @@ export interface Meta {
   formatSpecs: Record<string, { m2PerBox: number; boxesPerPallet: number; m2PerTile: number; maxTilesPerPallet: number }>;
   grades: Grade[];
   gradeLabels: Record<string, string>;
-  surfaces: string[];
   documentTypes: Record<string, string>;
 }
 

@@ -41,7 +41,6 @@ function enrich(item: PlanItemRow) {
     format,
     collection: product?.collection ?? '',
     color: product?.color ?? '',
-    surface: product?.surface ?? '',
     orderedM2,
     plannedM2: Math.round(orderedM2 * 1.1 * 100) / 100, // +10% на брак
     boxes: boxes(orderedM2, format, grade),
@@ -52,7 +51,7 @@ function enrich(item: PlanItemRow) {
 // План производства за месяц.
 router.get(
   '/plan',
-  requireRole('FACTORY', 'MANAGER', 'WAREHOUSE'),
+  requireRole('MANAGER', 'SALES_HEAD', 'WAREHOUSE'),
   asyncHandler(async (req, res) => {
     const now = new Date();
     const year = parseInt((req.query.year as string) ?? String(now.getFullYear()), 10);
@@ -72,7 +71,7 @@ router.get(
 
 router.get(
   '/plans',
-  requireRole('FACTORY', 'MANAGER', 'WAREHOUSE'),
+  requireRole('MANAGER', 'SALES_HEAD', 'WAREHOUSE'),
   asyncHandler(async (_req, res) => {
     res.json(await prisma.productionPlan.findMany({ orderBy: [{ year: 'desc' }, { month: 'desc' }] }));
   }),
@@ -81,7 +80,7 @@ router.get(
 // Полное редактирование позиции плана (завод): статус, даты, сорта, таможня, комментарии.
 router.patch(
   '/items/:id',
-  requireRole('FACTORY'),
+  requireRole('WAREHOUSE', 'MANAGER'),
   validateBody(
     z.object({
       status: z.enum(['PLANNED', 'IN_PRODUCTION', 'PRODUCED', 'TRANSFERRED']).optional(),

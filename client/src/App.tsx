@@ -17,7 +17,6 @@ import OrderFormPage from './pages/OrderFormPage';
 import OrderDetailPage from './pages/OrderDetailPage';
 import SpecificationsPage from './pages/SpecificationsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
-import ProductionPage from './pages/ProductionPage';
 import InventoryPage from './pages/InventoryPage';
 import ReservationsPage from './pages/ReservationsPage';
 import CalendarPage from './pages/CalendarPage';
@@ -85,7 +84,8 @@ export default function App() {
         <Route path="/orders/:id" element={<OrderDetailPage />} />
         <Route path="/specifications" element={<SpecificationsPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/production" element={<ProductionPage />} />
+        {/* План производства временно скрыт — вернём отдельной задачей.
+            Страница ./pages/ProductionPage и её API остались в коде. */}
         <Route path="/inventory" element={<InventoryPage />} />
         <Route path="/reservations" element={<ReservationsPage />} />
         <Route path="/calendar" element={<CalendarPage />} />

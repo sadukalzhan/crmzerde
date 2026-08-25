@@ -12,7 +12,6 @@ import type { AuthUser } from '../../middleware/auth';
 export const orderListInclude = {
   client: true,
   manager: { select: { id: true, fullName: true, email: true, role: true } },
-  factory: true,
   carrier: true,
   items: { include: { product: true } },
 } satisfies Prisma.OrderInclude;
@@ -56,7 +55,6 @@ async function recordHistory(
 export interface CreateOrderInput {
   clientId?: string;
   managerId?: string;
-  factoryId?: string;
   carrierId?: string;
   selfPickup?: boolean;
   priority?: string;
@@ -105,7 +103,6 @@ export async function createOrder(input: CreateOrderInput, actor: AuthUser) {
       desiredDate: input.desiredDate ? new Date(input.desiredDate) : null,
       clientId,
       managerId: input.managerId ?? client.managerId ?? null,
-      factoryId: input.factoryId,
       carrierId: selfPickup ? null : input.carrierId,
       items: {
         create: input.items.map((i) => ({
@@ -341,7 +338,7 @@ export async function addToProductionPlan(orderId: string, actor: AuthUser) {
     data: { productionStartDate: startDate, productionPriority: priority },
   });
 
-  await notifyRole('FACTORY', {
+  await notifyRole('WAREHOUSE', {
     type: 'PLAN_ADDED',
     title: `Новые позиции в плане: #${order.number}`,
     body: `Плановый месяц ${String(month).padStart(2, '0')}.${year}, позиций: ${created}, приоритет ${priority}`,
@@ -640,7 +637,6 @@ export async function listOrders(actor: AuthUser, filters: Record<string, string
 
   if (filters.status && isOrderStatus(filters.status)) where.status = filters.status;
   if (filters.priority) where.priority = filters.priority;
-  if (filters.factoryId) where.factoryId = filters.factoryId;
   if (filters.carrierId) where.carrierId = filters.carrierId;
   if (filters.clientId && actor.role !== 'CLIENT') where.clientId = filters.clientId;
   if (filters.search) {

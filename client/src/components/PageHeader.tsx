@@ -11,9 +11,13 @@ export function PageHeader({
 }) {
   return (
     <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 className="text-xl font-bold text-white">{title}</h1>
+      <div className="min-w-0">
+        <h1 className="text-[22px] font-bold tracking-tight text-white">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+        <div className="mt-3 flex items-center gap-2">
+          <span className="rule-gold" />
+          <span className="h-1 w-1 rotate-45 bg-accent/70" />
+        </div>
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>

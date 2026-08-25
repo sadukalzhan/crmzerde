@@ -32,7 +32,7 @@ async function loadStock() {
 // Остатки и резервы по товарам и сортам (+ коробки/поддоны).
 router.get(
   '/',
-  requireRole('WAREHOUSE', 'MANAGER', 'FACTORY'),
+  requireRole('WAREHOUSE', 'MANAGER', 'SALES_HEAD'),
   asyncHandler(async (_req, res) => {
     res.json(await loadStock());
   }),
@@ -41,7 +41,7 @@ router.get(
 // Выгрузка остатков в Excel.
 router.get(
   '/export',
-  requireRole('WAREHOUSE', 'MANAGER'),
+  requireRole('WAREHOUSE', 'MANAGER', 'SALES_HEAD'),
   asyncHandler(async (_req, res) => {
     const stock = await loadStock();
     const wb = new ExcelJS.Workbook();
@@ -51,7 +51,6 @@ router.get(
       { header: 'Формат', key: 'format', width: 10 },
       { header: 'Коллекция', key: 'collection', width: 16 },
       { header: 'Цвет', key: 'color', width: 14 },
-      { header: 'Поверхность', key: 'surface', width: 16 },
       { header: 'Сорт', key: 'grade', width: 8 },
       { header: 'Остаток, м²', key: 'quantity', width: 12 },
       { header: 'Резерв, м²', key: 'reserved', width: 12 },
@@ -66,7 +65,6 @@ router.get(
         format: FORMAT_LABELS[s.product.format] ?? s.product.format,
         collection: s.product.collection ?? '',
         color: s.product.color ?? '',
-        surface: s.product.surface ?? '',
         grade: GRADE_LABELS[s.grade] ?? s.grade,
         quantity: s.quantity,
         reserved: s.reserved,
@@ -82,6 +80,39 @@ router.get(
   }),
 );
 
+// Шаблон для заливки актуальных остатков (только админ). Колонки те же, что
+// понимает импорт ниже; строки предзаполнены текущей номенклатурой, чтобы
+// названия точно совпали и товар не потерялся при загрузке.
+router.get(
+  '/template',
+  requireRole('ADMIN'),
+  asyncHandler(async (_req, res) => {
+    const products = await prisma.product.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Остатки');
+    ws.columns = [
+      { header: 'Номенклатура', key: 'name', width: 32 },
+      { header: 'Сорт', key: 'grade', width: 10 },
+      { header: 'Остаток, м²', key: 'quantity', width: 14 },
+    ];
+    ws.getRow(1).font = { bold: true };
+    for (const p of products) {
+      for (const grade of ['A', 'B', 'C', 'BRAK']) {
+        ws.addRow({ name: p.name, grade: GRADE_LABELS[grade] ?? grade, quantity: 0 });
+      }
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="ostatki-shablon.xlsx"');
+    await wb.xlsx.write(res);
+    res.end();
+  }),
+);
+
 // Импорт остатков из Excel (данные из 1С). Столбцы: Номенклатура, Сорт, Остаток м².
 // Товар ищется по названию, сорт — по метке/ключу; количество устанавливается абсолютно.
 const GRADE_REV: Record<string, string> = {
@@ -91,7 +122,7 @@ const GRADE_REV: Record<string, string> = {
 
 router.post(
   '/import',
-  requireRole('WAREHOUSE', 'ADMIN'),
+  requireRole('ADMIN'),
   upload.single('file'),
   asyncHandler(async (req, res) => {
     if (!req.file) throw badRequest('Файл не передан');
@@ -165,7 +196,7 @@ router.patch(
 // Скорректировать остаток (приход/расход) по товару и сорту.
 router.post(
   '/adjust',
-  requireRole('WAREHOUSE', 'FACTORY'),
+  requireRole('WAREHOUSE'),
   validateBody(z.object({ productId: z.string(), grade: z.enum(['A', 'B', 'C', 'BRAK']).default('A'), delta: z.number() })),
   asyncHandler(async (req, res) => {
     const { productId, grade, delta } = req.body;

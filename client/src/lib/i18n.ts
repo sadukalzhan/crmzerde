@@ -43,7 +43,6 @@ const ru: Dict = {
   'common.delivered': 'Доставлено',
   'common.rejected': 'Отклонено',
   'common.priority': 'Приоритет',
-  'common.factory': 'Завод',
   'common.carrier': 'Перевозчик',
   'common.client': 'Клиент',
   'common.manager': 'Менеджер',

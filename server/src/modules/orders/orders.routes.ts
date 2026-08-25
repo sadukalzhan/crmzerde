@@ -12,7 +12,6 @@ router.use(authenticate);
 const createSchema = z.object({
   clientId: z.string().optional(),
   managerId: z.string().optional(),
-  factoryId: z.string().optional(),
   carrierId: z.string().optional(),
   selfPickup: z.boolean().optional(),
   priority: z.enum(['HIGH', 'MEDIUM', 'LOW']).optional(),
@@ -45,7 +44,6 @@ const paymentSchema = z.object({
 const updateSchema = z.object({
   priority: z.enum(['HIGH', 'MEDIUM', 'LOW']).optional(),
   managerId: z.string().nullable().optional(),
-  factoryId: z.string().nullable().optional(),
   carrierId: z.string().nullable().optional(),
   selfPickup: z.boolean().optional(),
   shipFrom: z.string().optional(),
@@ -61,7 +59,6 @@ router.get(
     const orders = await service.listOrders(req.user!, {
       status: f.status,
       priority: f.priority,
-      factoryId: f.factoryId,
       carrierId: f.carrierId,
       clientId: f.clientId,
       search: f.search,
@@ -90,7 +87,7 @@ router.get(
 // Создание заявки (клиент — от своего имени; менеджер/админ — за любого клиента)
 router.post(
   '/',
-  requireRole('CLIENT', 'MANAGER'),
+  requireRole('CLIENT', 'MANAGER', 'SALES_HEAD'),
   validateBody(createSchema),
   asyncHandler(async (req, res) => {
     res.status(201).json(await service.createOrder(req.body, req.user!));
@@ -109,7 +106,7 @@ router.post(
 // Постановка в план производства
 router.post(
   '/:id/to-production',
-  requireRole('MANAGER', 'WAREHOUSE', 'FACTORY'),
+  requireRole('MANAGER', 'SALES_HEAD', 'WAREHOUSE'),
   asyncHandler(async (req, res) => {
     res.json(await service.addToProductionPlan(req.params.id, req.user!));
   }),
@@ -118,7 +115,7 @@ router.post(
 // Регламент, п. 8: клиент подтвердил готовность ждать производство.
 router.post(
   '/:id/production-accept',
-  requireRole('MANAGER', 'CLIENT'),
+  requireRole('MANAGER', 'SALES_HEAD', 'CLIENT'),
   asyncHandler(async (req, res) => {
     res.json(await service.acceptProduction(req.params.id, req.user!));
   }),
@@ -127,7 +124,7 @@ router.post(
 // Регламент, п. 4: снять резерв того же клиента и перенести на эту заявку.
 router.post(
   '/:id/reservations/:reservationId/release',
-  requireRole('MANAGER', 'WAREHOUSE'),
+  requireRole('MANAGER', 'SALES_HEAD', 'WAREHOUSE'),
   asyncHandler(async (req, res) => {
     res.json(await service.releaseReservation(req.params.id, req.params.reservationId, req.user!));
   }),
@@ -136,7 +133,7 @@ router.post(
 // Регламент, п. 5: запросить снятие резерва у другого партнёра.
 router.post(
   '/:id/reservations/:reservationId/request-release',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'SALES_HEAD'),
   asyncHandler(async (req, res) => {
     res.json(await service.requestReservationRelease(req.params.id, req.params.reservationId, req.user!));
   }),
@@ -145,7 +142,7 @@ router.post(
 // Обновление статуса оплаты (бухгалтер)
 router.post(
   '/:id/payment',
-  requireRole('ACCOUNTANT', 'MANAGER'),
+  requireRole('MANAGER', 'SALES_HEAD'),
   validateBody(paymentSchema),
   asyncHandler(async (req, res) => {
     res.json(await service.updatePayment(req.params.id, req.body.status, req.user!));
@@ -155,7 +152,7 @@ router.post(
 // Обновление полей заявки
 router.patch(
   '/:id',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'SALES_HEAD'),
   validateBody(updateSchema),
   asyncHandler(async (req, res) => {
     const { prisma } = await import('../../lib/prisma');

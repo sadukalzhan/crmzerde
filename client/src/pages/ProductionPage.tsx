@@ -37,7 +37,6 @@ interface PlanItem {
   format: string;
   collection: string;
   color: string;
-  surface: string;
   orderedM2: number;
   plannedM2: number;
   boxes: number;
@@ -47,7 +46,7 @@ const toInput = (iso: string | null) => (iso ? iso.slice(0, 10) : '');
 
 export default function ProductionPage() {
   const user = useAuth((s) => s.user)!;
-  const canEdit = user.role === 'FACTORY' || user.role === 'ADMIN';
+  const canEdit = user.role === 'WAREHOUSE' || user.role === 'ADMIN';
   const now = new Date();
   const [period, setPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
   const { data: plan, isLoading } = useProductionPlan(period.year, period.month);
@@ -132,7 +131,6 @@ export default function ProductionPage() {
                       <td className="px-3 py-2.5 text-muted">{it.color || '—'}</td>
                       <td className="px-3 py-2.5 text-right text-slate-200">{fmtM2(it.orderedM2)}</td>
                       <td className="px-3 py-2.5 text-right text-accent">{fmtM2(it.plannedM2)}</td>
-                      <td className="px-3 py-2.5 text-muted">{it.surface || '—'}</td>
                       <td className="px-3 py-2.5 text-muted">{fmtDate(it.endDate)}</td>
                       <td className="px-3 py-2.5"><span className={cn('chip text-[11px]', st.cls)}>{st.label}</span></td>
                       <td className="px-3 py-2.5 text-right text-emerald-300">{it.gradeA || 0}</td>

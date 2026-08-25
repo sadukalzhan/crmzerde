@@ -18,7 +18,6 @@ export const GRADE_LABELS: Record<string, string> = {
   BRAK: 'Брак',
 };
 
-export const SURFACES = ['Матовая', 'Полированная', 'Лаппатированная', 'Структурированная', 'Сатинированная'];
 
 interface FormatSpec {
   m2PerBox: number;

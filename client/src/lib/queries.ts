@@ -7,7 +7,6 @@ import type {
   Client,
   Contract,
   DocumentItem,
-  Factory,
   Carrier,
   Inventory,
   Meta,
@@ -30,7 +29,6 @@ export const useSettings = () =>
 export interface OrderFilters {
   status?: string;
   priority?: string;
-  factoryId?: string;
   carrierId?: string;
   clientId?: string;
   search?: string;
@@ -178,8 +176,6 @@ export const useClients = (opts?: { enabled?: boolean }) =>
 export const useUsers = () =>
   useQuery({ queryKey: ['users'], queryFn: async () => (await api.get<User[]>('/users')).data });
 
-export const useFactories = () =>
-  useQuery({ queryKey: ['factories'], queryFn: async () => (await api.get<Factory[]>('/refs/factories')).data });
 
 export const useCarriers = () =>
   useQuery({ queryKey: ['carriers'], queryFn: async () => (await api.get<Carrier[]>('/refs/carriers')).data });

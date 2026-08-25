@@ -30,7 +30,6 @@ const productSchema = z.object({
   size: z.string().optional(),
   collection: z.string().optional(),
   color: z.string().optional(),
-  surface: z.string().optional(),
   pricePerUnit: z.number().nonnegative().default(0), // цена за м²
 });
 

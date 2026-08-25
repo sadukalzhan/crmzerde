@@ -12,7 +12,7 @@ router.use(authenticate);
 // Справочник клиентов (сотрудникам). Менеджер видит своих + без менеджера.
 router.get(
   '/',
-  requireRole('MANAGER', 'ACCOUNTANT', 'WAREHOUSE', 'LOGIST', 'FACTORY'),
+  requireRole('MANAGER', 'SALES_HEAD', 'WAREHOUSE'),
   asyncHandler(async (req, res) => {
     const where =
       req.user!.role === 'MANAGER'
@@ -29,7 +29,7 @@ router.get(
 
 router.get(
   '/:id',
-  requireRole('MANAGER', 'ACCOUNTANT'),
+  requireRole('MANAGER', 'SALES_HEAD'),
   asyncHandler(async (req, res) => {
     res.json(
       await prisma.client.findUniqueOrThrow({
@@ -62,7 +62,7 @@ router.post(
 
 router.patch(
   '/:id',
-  requireRole('MANAGER', 'ACCOUNTANT'),
+  requireRole('MANAGER', 'SALES_HEAD'),
   validateBody(
     z.object({
       companyName: z.string().min(2).optional(),

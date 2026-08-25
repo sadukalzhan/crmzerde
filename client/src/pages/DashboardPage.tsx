@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, Loader, Truck, XCircle, Factory } from 'lucide-react';
+import { ClipboardList, Loader, Truck, XCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Page, PageHeader } from '../components/PageHeader';
 import { StatCard } from '../components/StatCard';
@@ -27,7 +27,7 @@ export default function DashboardPage() {
 
   return (
     <Page>
-      <PageHeader title={`Здравствуйте, ${user?.fullName.split(' ')[0]}`} subtitle="Сводка по заявкам и производству" />
+      <PageHeader title={`Здравствуйте, ${user?.fullName.split(' ')[0]}`} subtitle="Сводка по заявкам и складу" />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Всего заявок" value={summary.total} icon={ClipboardList} tone="accent" />
@@ -36,9 +36,9 @@ export default function DashboardPage() {
         <StatCard label="Отклонено" value={summary.rejected} icon={XCircle} tone="rose" />
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
+      <div className="mt-5 grid grid-cols-1 gap-5">
         {/* Распределение по этапам */}
-        <div className="card p-5 lg:col-span-2">
+        <div className="card p-5">
           <h3 className="mb-4 text-sm font-semibold text-white">Заявки по этапам</h3>
           {chartData.length === 0 ? (
             <EmptyState title="Нет данных" />
@@ -60,19 +60,6 @@ export default function DashboardPage() {
               </BarChart>
             </ResponsiveContainer>
           )}
-        </div>
-
-        {/* План производства */}
-        <div className="card flex flex-col p-5">
-          <h3 className="mb-4 text-sm font-semibold text-white">План производства</h3>
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-300">
-              <Factory size={28} />
-            </div>
-            <div className="text-4xl font-bold text-white">{summary.plannedThisMonth}</div>
-            <div className="text-sm text-muted">заявок в плане на текущий месяц</div>
-            <button onClick={() => navigate('/production')} className="btn-soft mt-2">Открыть план</button>
-          </div>
         </div>
       </div>
 

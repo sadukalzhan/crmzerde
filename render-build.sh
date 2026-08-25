@@ -21,7 +21,7 @@ echo "==> Применение схемы к БД"
 cd server
 npx prisma db push --skip-generate --accept-data-loss
 
-echo "==> Нормализация данных под изменившиеся статусы"
+echo "==> Нормализация данных под изменившиеся статусы и роли"
 npx tsx scripts/normalize-statuses.ts
 
 echo "==> Сид (один раз на версию модели данных)"

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, PackagePlus } from 'lucide-react';
 import { Page, PageHeader } from '../components/PageHeader';
 import { Field } from '../components/ui';
-import { useProducts, useClients, useFactories, useCarriers, useCreateOrder } from '../lib/queries';
+import { useProducts, useClients, useCarriers, useCreateOrder } from '../lib/queries';
 import { fmtMoney, fmtM2 } from '../lib/format';
 import { boxes, pallets, GRADES, GRADE_LABELS } from '../lib/packaging';
 import { apiError } from '../lib/api';
@@ -19,12 +19,10 @@ export default function OrderFormPage() {
 
   const { data: products = [] } = useProducts();
   const { data: clients = [] } = useClients({ enabled: !isClient });
-  const { data: factories = [] } = useFactories();
   const { data: carriers = [] } = useCarriers();
   const createOrder = useCreateOrder();
 
   const [clientId, setClientId] = useState('');
-  const [factoryId, setFactoryId] = useState('');
   const [carrierId, setCarrierId] = useState('');
   const [selfPickup, setSelfPickup] = useState(false);
   const [priority, setPriority] = useState('MEDIUM');
@@ -38,7 +36,8 @@ export default function OrderFormPage() {
     const p = products.find((x) => x.id === r.productId);
     return s + (p ? p.pricePerUnit * r.quantity : 0);
   }, 0);
-  const factoryCity = factories.find((f) => f.id === factoryId)?.city;
+  // Завод один — город отгрузки постоянный.
+  const SHIP_FROM = 'Актобе';
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,12 +53,11 @@ export default function OrderFormPage() {
     createOrder.mutate(
       {
         clientId: isClient ? undefined : clientId,
-        factoryId: factoryId || undefined,
         carrierId: selfPickup ? undefined : carrierId || undefined,
         selfPickup,
         priority: isClient ? undefined : priority,
         paymentTerm,
-        shipFrom: factoryCity,
+        shipFrom: SHIP_FROM,
         shipTo: shipTo || undefined,
         desiredDate: desiredDate || undefined,
         items,
@@ -145,12 +143,6 @@ export default function OrderFormPage() {
               Самовывоз (без перевозчика)
             </label>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Завод-отгрузка">
-                <select className="input" value={factoryId} onChange={(e) => setFactoryId(e.target.value)}>
-                  <option value="">Не выбран</option>
-                  {factories.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.city})</option>)}
-                </select>
-              </Field>
               <Field label="Перевозчик">
                 <select
                   className="input disabled:opacity-50"

@@ -6,7 +6,7 @@ import { PageLoader } from '../components/ui';
 import { Modal } from '../components/ui';
 import { Field } from '../components/ui';
 import { KanbanBoard } from '../components/kanban/KanbanBoard';
-import { useMeta, useOrders, useTransition, useFactories, useCarriers } from '../lib/queries';
+import { useMeta, useOrders, useTransition, useCarriers } from '../lib/queries';
 import { kanbanStatusesForRole, boardStats } from '../lib/board';
 import { useAuth } from '../lib/store';
 import { apiError } from '../lib/api';
@@ -18,17 +18,14 @@ export default function KanbanPage() {
   const navigate = useNavigate();
   const user = useAuth((s) => s.user)!;
   const { data: meta } = useMeta();
-  const { data: factories = [] } = useFactories();
   const { data: carriers = [] } = useCarriers();
 
-  const [factoryId, setFactoryId] = useState('');
   const [carrierId, setCarrierId] = useState('');
   const [priority, setPriority] = useState('');
   const now = new Date();
   const [monthFilter, setMonthFilter] = useState<{ year: number; month: number } | null>(null);
 
   const { data: orders = [], isLoading } = useOrders({
-    factoryId: factoryId || undefined,
     carrierId: carrierId || undefined,
     priority: priority || undefined,
   });
@@ -100,14 +97,6 @@ export default function KanbanPage() {
 
       {/* Фильтры */}
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div className="w-44">
-          <Field label="Завод">
-            <select className="input" value={factoryId} onChange={(e) => setFactoryId(e.target.value)}>
-              <option value="">Все</option>
-              {factories.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-            </select>
-          </Field>
-        </div>
         <div className="w-44">
           <Field label="Перевозчик">
             <select className="input" value={carrierId} onChange={(e) => setCarrierId(e.target.value)}>

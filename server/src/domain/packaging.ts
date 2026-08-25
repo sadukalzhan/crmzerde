@@ -19,9 +19,6 @@ export const GRADE_LABELS: Record<string, string> = {
   BRAK: 'Брак',
 };
 
-// Часто используемые поверхности (свободный ввод, это лишь подсказки).
-export const SURFACES = ['Матовая', 'Полированная', 'Лаппатированная', 'Структурированная', 'Сатинированная'];
-
 interface FormatSpec {
   m2PerBox: number; // кв.м в одной коробке
   boxesPerPallet: number; // коробок на поддоне (сорт A/B)

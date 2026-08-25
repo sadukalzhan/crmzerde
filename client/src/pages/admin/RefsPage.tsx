@@ -3,18 +3,18 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Upload, FileSpreadsheet } from 'lucide-react';
 import { Page, PageHeader } from '../../components/PageHeader';
 import { PageLoader, EmptyState, Modal, Field } from '../../components/ui';
-import { useFactories, useCarriers, useProducts } from '../../lib/queries';
+import { useCarriers, useProducts } from '../../lib/queries';
 import { api, apiError } from '../../lib/api';
 import { toast } from '../../components/toast';
 import { fmtMoney } from '../../lib/format';
 import { FORMAT_LABELS } from '../../lib/packaging';
 import { cn } from '../../lib/cn';
 
-type Tab = 'factories' | 'carriers' | 'products';
+type Tab = 'products' | 'carriers';
 
 export default function RefsPage() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<Tab>('factories');
+  const [tab, setTab] = useState<Tab>('products');
   const [open, setOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -55,14 +55,12 @@ export default function RefsPage() {
     }
   };
 
-  const { data: factories = [], isLoading: l1 } = useFactories();
   const { data: carriers = [], isLoading: l2 } = useCarriers();
   const { data: products = [], isLoading: l3 } = useProducts();
 
-  if (l1 || l2 || l3) return <PageLoader />;
+  if (l2 || l3) return <PageLoader />;
 
   const tabs: { k: Tab; label: string; count: number }[] = [
-    { k: 'factories', label: 'Заводы', count: factories.length },
     { k: 'carriers', label: 'Перевозчики', count: carriers.length },
     { k: 'products', label: 'Номенклатура', count: products.length },
   ];
@@ -72,7 +70,7 @@ export default function RefsPage() {
     <Page>
       <PageHeader
         title="Справочники"
-        subtitle="Заводы, перевозчики и номенклатура. Импорт из Excel — в активную вкладку"
+        subtitle="Номенклатура и перевозчики. Импорт из Excel — в активную вкладку"
         actions={
           <div className="flex flex-wrap gap-2">
             <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={onImport} />
@@ -96,17 +94,6 @@ export default function RefsPage() {
       </div>
 
       <div className="card overflow-hidden">
-        {tab === 'factories' && (
-          factories.length === 0 ? <EmptyState title="Нет заводов" /> :
-          <ul className="divide-y divide-border">
-            {factories.map((f) => (
-              <li key={f.id} className="flex items-center justify-between px-4 py-3">
-                <span className="font-medium text-slate-100">{f.name}</span>
-                <span className="text-sm text-muted">{f.city}</span>
-              </li>
-            ))}
-          </ul>
-        )}
         {tab === 'carriers' && (
           carriers.length === 0 ? <EmptyState title="Нет перевозчиков" /> :
           <ul className="divide-y divide-border">
@@ -129,7 +116,6 @@ export default function RefsPage() {
                     {FORMAT_LABELS[p.format] ?? p.format}
                     {p.collection && ` · ${p.collection}`}
                     {p.color && ` · ${p.color}`}
-                    {p.surface && ` · ${p.surface}`}
                   </div>
                 </div>
                 <span className="text-sm font-medium text-slate-200">{fmtMoney(p.pricePerUnit)}/м²</span>
@@ -150,10 +136,7 @@ function AddModal({ tab, open, onClose, onDone }: { tab: Tab; open: boolean; onC
 
   const save = async () => {
     try {
-      if (tab === 'factories') {
-        await api.post('/refs/factories', { name: form.name, city: form.city });
-        onDone('factories');
-      } else if (tab === 'carriers') {
+      if (tab === 'carriers') {
         await api.post('/refs/carriers', { name: form.name, phone: form.phone });
         onDone('carriers');
       } else {
@@ -162,7 +145,6 @@ function AddModal({ tab, open, onClose, onDone }: { tab: Tab; open: boolean; onC
           format: form.format || '60x60',
           collection: form.collection || undefined,
           color: form.color || undefined,
-          surface: form.surface || undefined,
           pricePerUnit: Number(form.price || 0),
         });
         onDone('products');
@@ -177,12 +159,6 @@ function AddModal({ tab, open, onClose, onDone }: { tab: Tab; open: boolean; onC
   return (
     <Modal open={open} onClose={onClose} title="Новая запись" footer={<><button className="btn-ghost" onClick={onClose}>Отмена</button><button className="btn-primary" onClick={save}>Создать</button></>}>
       <div className="space-y-3">
-        {tab === 'factories' && (
-          <>
-            <Field label="Название"><input className="input" value={form.name ?? ''} onChange={set('name')} /></Field>
-            <Field label="Город"><input className="input" value={form.city ?? ''} onChange={set('city')} /></Field>
-          </>
-        )}
         {tab === 'carriers' && (
           <>
             <Field label="Название"><input className="input" value={form.name ?? ''} onChange={set('name')} /></Field>
@@ -203,7 +179,6 @@ function AddModal({ tab, open, onClose, onDone }: { tab: Tab; open: boolean; onC
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Цвет"><input className="input" value={form.color ?? ''} onChange={set('color')} /></Field>
-              <Field label="Поверхность (технология)"><input className="input" value={form.surface ?? ''} onChange={set('surface')} placeholder="Матовая" /></Field>
             </div>
             <Field label="Цена за м²"><input className="input" type="number" value={form.price ?? ''} onChange={set('price')} /></Field>
           </>

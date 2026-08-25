@@ -12,32 +12,6 @@ import { GRADES, isFormat } from '../../domain/packaging';
 const router = Router();
 router.use(authenticate);
 
-// ── Заводы ──
-router.get(
-  '/factories',
-  asyncHandler(async (_req, res) => {
-    res.json(await prisma.factory.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }));
-  }),
-);
-
-router.post(
-  '/factories',
-  requireRole('ADMIN'),
-  validateBody(z.object({ name: z.string().min(2), city: z.string().min(2) })),
-  asyncHandler(async (req, res) => {
-    res.status(201).json(await prisma.factory.create({ data: req.body }));
-  }),
-);
-
-router.patch(
-  '/factories/:id',
-  requireRole('ADMIN'),
-  validateBody(z.object({ name: z.string().optional(), city: z.string().optional(), isActive: z.boolean().optional() })),
-  asyncHandler(async (req, res) => {
-    res.json(await prisma.factory.update({ where: { id: req.params.id }, data: req.body }));
-  }),
-);
-
 // ── Перевозчики ──
 router.get(
   '/carriers',
@@ -69,7 +43,7 @@ router.patch(
 // порядок не важен. Запись с уже существующим названием обновляется, а не
 // дублируется, поэтому файл можно заливать повторно.
 
-type RefKind = 'products' | 'factories' | 'carriers';
+type RefKind = 'products' | 'carriers';
 
 /** Индекс колонок по заголовку первой строки. */
 function columnIndex(ws: ExcelJS.Worksheet) {
@@ -93,12 +67,7 @@ const TEMPLATE_COLUMNS: Record<RefKind, { header: string; width: number }[]> = {
     { header: 'Формат', width: 12 },
     { header: 'Коллекция', width: 18 },
     { header: 'Цвет', width: 14 },
-    { header: 'Поверхность', width: 18 },
     { header: 'Цена за м²', width: 14 },
-  ],
-  factories: [
-    { header: 'Название', width: 28 },
-    { header: 'Город', width: 20 },
   ],
   carriers: [
     { header: 'Название', width: 28 },
@@ -108,7 +77,6 @@ const TEMPLATE_COLUMNS: Record<RefKind, { header: string; width: number }[]> = {
 
 const TEMPLATE_FILES: Record<RefKind, string> = {
   products: 'nomenklatura-shablon.xlsx',
-  factories: 'zavody-shablon.xlsx',
   carriers: 'perevozchiki-shablon.xlsx',
 };
 
@@ -160,7 +128,6 @@ router.post(
         const formatCol = findCol('формат', 'format');
         const collectionCol = findCol('коллекц', 'collection');
         const colorCol = findCol('цвет', 'color');
-        const surfaceCol = findCol('поверхн', 'технолог', 'surface');
         const priceCol = findCol('цена', 'price');
 
         for (let r = 2; r <= ws.rowCount; r++) {
@@ -175,7 +142,6 @@ router.post(
             format,
             collection: cellText(row, collectionCol) || null,
             color: cellText(row, colorCol) || null,
-            surface: cellText(row, surfaceCol) || null,
             pricePerUnit: Number.isFinite(price) ? price : 0,
           };
 
@@ -194,27 +160,6 @@ router.post(
                 inventory: { create: GRADES.map((grade) => ({ grade, quantity: 0, reserved: 0, unit: 'M2' })) },
               },
             });
-            created++;
-          }
-        }
-      } else if (kind === 'factories') {
-        const cityCol = findCol('город', 'city');
-        for (let r = 2; r <= ws.rowCount; r++) {
-          const row = ws.getRow(r);
-          const name = cellText(row, nameCol);
-          if (!name) continue;
-          const city = cellText(row, cityCol);
-          if (!city) {
-            skipped++;
-            errors.push(`Не указан город: «${name}»`);
-            continue;
-          }
-          const existing = await prisma.factory.findFirst({ where: { name } });
-          if (existing) {
-            await prisma.factory.update({ where: { id: existing.id }, data: { city, isActive: true } });
-            updated++;
-          } else {
-            await prisma.factory.create({ data: { name, city } });
             created++;
           }
         }

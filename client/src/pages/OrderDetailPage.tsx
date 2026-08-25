@@ -12,7 +12,7 @@ import {
   useOrder, useMeta, useProducts, useTransition, useUpdatePayment,
   useAvailability, useAcceptProduction, useReleaseReservation,
   useUploadDocument, useSignSpec, useCreateSpec, useCreateContract, useSignContract, useUpdateClaim,
-  useCreateClaim, useUpdateOrder, useDeleteOrder, useUsers, useFactories, useCarriers,
+  useCreateClaim, useUpdateOrder, useDeleteOrder, useUsers,  useCarriers,
 } from '../lib/queries';
 import { api, apiError, fileHref } from '../lib/api';
 import { toast } from '../components/toast';
@@ -498,7 +498,7 @@ export default function OrderDetailPage() {
           </Section>
 
           {/* Оплата */}
-          {(user.role === 'ACCOUNTANT' || user.role === 'MANAGER' || user.role === 'ADMIN') && (
+          {(user.role === 'MANAGER' || user.role === 'SALES_HEAD' || user.role === 'ADMIN') && (
             <Section title="Оплата">
               <PaymentControl
                 current={order.paymentStatus}
@@ -514,7 +514,6 @@ export default function OrderDetailPage() {
           <Section title="Информация">
             <dl className="space-y-2.5 text-sm">
               <Info label="Менеджер" value={order.manager?.fullName ?? '—'} />
-              <Info label="Завод" value={order.factory?.name ?? '—'} />
               <Info label="Доставка" value={order.selfPickup ? 'Самовывоз' : order.carrier?.name ?? '—'} />
               <Info label="Желаемая дата" value={fmtDate(order.desiredDate)} />
               <Info label="Запуск в произв." value={fmtDate(order.productionStartDate)} />
@@ -648,13 +647,11 @@ export default function OrderDetailPage() {
 function AdminEditModal({ order, onClose }: { order: Order; onClose: () => void }) {
   const update = useUpdateOrder();
   const { data: users = [] } = useUsers();
-  const { data: factories = [] } = useFactories();
   const { data: carriers = [] } = useCarriers();
-  const managers = users.filter((u) => u.role === 'MANAGER');
+  const managers = users.filter((u) => u.role === 'MANAGER' || u.role === 'SALES_HEAD');
   const [form, setForm] = useState({
     priority: order.priority,
     managerId: order.manager?.id ?? '',
-    factoryId: order.factory?.id ?? '',
     carrierId: order.carrier?.id ?? '',
     selfPickup: order.selfPickup,
     shipTo: order.shipTo ?? '',
@@ -668,7 +665,6 @@ function AdminEditModal({ order, onClose }: { order: Order; onClose: () => void 
         data: {
           priority: form.priority,
           managerId: form.managerId || null,
-          factoryId: form.factoryId || null,
           carrierId: form.selfPickup ? null : form.carrierId || null,
           selfPickup: form.selfPickup,
           shipTo: form.shipTo || undefined,
@@ -698,12 +694,6 @@ function AdminEditModal({ order, onClose }: { order: Order; onClose: () => void 
           <select className="input" value={form.managerId} onChange={(e) => setForm({ ...form, managerId: e.target.value })}>
             <option value="">Не назначен</option>
             {managers.map((m) => <option key={m.id} value={m.id}>{m.fullName}</option>)}
-          </select>
-        </Field>
-        <Field label="Завод">
-          <select className="input" value={form.factoryId} onChange={(e) => setForm({ ...form, factoryId: e.target.value })}>
-            <option value="">Не выбран</option>
-            {factories.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
         </Field>
         <Field label="Перевозчик">

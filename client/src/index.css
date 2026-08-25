@@ -14,21 +14,23 @@
   body {
     @apply bg-bg text-slate-200 font-sans antialiased;
     margin: 0;
+    background-image: theme('backgroundImage.nocturn-glow');
+    background-attachment: fixed;
   }
   * {
     scrollbar-width: thin;
-    scrollbar-color: #2a3142 transparent;
+    scrollbar-color: #3B3325 transparent;
   }
   ::-webkit-scrollbar {
     width: 9px;
     height: 9px;
   }
   ::-webkit-scrollbar-thumb {
-    background: #2a3142;
+    background: #3B3325;
     border-radius: 8px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #394056;
+    background: #55492F;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
@@ -38,6 +40,18 @@
 @layer components {
   .card {
     @apply rounded-xl border border-border bg-card shadow-card;
+  }
+  /* Карточка-показатель с золотой засечкой сверху */
+  .card-kpi {
+    @apply card relative overflow-hidden;
+  }
+  .card-kpi::before {
+    content: '';
+    @apply absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent to-transparent opacity-70;
+  }
+  /* Тонкая золотая линия-разделитель в заголовках секций */
+  .rule-gold {
+    @apply h-px flex-1 bg-gradient-to-r from-border via-accent/25 to-transparent;
   }
   .panel {
     @apply rounded-2xl border border-border bg-panel;
@@ -55,7 +69,8 @@
            transition disabled:cursor-not-allowed disabled:opacity-50 select-none;
   }
   .btn-primary {
-    @apply btn bg-accent text-white hover:bg-accent-hover shadow-[0_4px_14px_rgba(124,108,246,0.35)];
+    /* Золотая заливка с тёмным текстом — как в макете */
+    @apply btn bg-gold text-[#1A1509] hover:brightness-110 shadow-[0_4px_16px_rgba(201,162,39,0.3)];
   }
   .btn-ghost {
     @apply btn border border-border bg-transparent text-slate-300 hover:bg-panel-2 hover:text-white;

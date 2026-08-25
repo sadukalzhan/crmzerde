@@ -21,9 +21,10 @@ const GRADE_CLASS: Record<string, string> = {
 
 export default function InventoryPage() {
   const user = useAuth((s) => s.user)!;
-  const canEdit = user.role === 'WAREHOUSE' || user.role === 'ADMIN' || user.role === 'FACTORY';
+  const canEdit = user.role === 'WAREHOUSE' || user.role === 'ADMIN';
   const qc = useQueryClient();
-  const canImport = user.role === 'WAREHOUSE' || user.role === 'ADMIN';
+  // Актуальные остатки заливает только админ (шаблон + импорт).
+  const canImport = user.role === 'ADMIN';
   const { data: inventory = [], isLoading } = useInventory();
   const [adjust, setAdjust] = useState<Inventory | null>(null);
   const [delta, setDelta] = useState(0);
@@ -60,6 +61,22 @@ export default function InventoryPage() {
     }
   };
 
+  // Шаблон уже содержит всю номенклатуру построчно по сортам — админу
+  // остаётся проставить фактические остатки и залить файл обратно.
+  const downloadTemplate = async () => {
+    try {
+      const res = await api.get('/inventory/template', { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'ostatki-shablon.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
+
   const exportExcel = async () => {
     try {
       const res = await api.get('/inventory/export', { responseType: 'blob' });
@@ -85,6 +102,9 @@ export default function InventoryPage() {
             {canImport && (
               <>
                 <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={onImport} />
+                <button onClick={downloadTemplate} className="btn-soft">
+                  <FileSpreadsheet size={16} /> Шаблон остатков
+                </button>
                 <button onClick={() => fileRef.current?.click()} className="btn-soft">
                   <Upload size={16} /> Импорт из Excel
                 </button>
@@ -109,7 +129,6 @@ export default function InventoryPage() {
                   <th className="px-4 py-3 font-medium">Формат</th>
                   <th className="px-4 py-3 font-medium">Коллекция</th>
                   <th className="px-4 py-3 font-medium">Цвет</th>
-                  <th className="px-4 py-3 font-medium">Поверхность</th>
                   <th className="px-4 py-3 font-medium">Сорт</th>
                   <th className="px-4 py-3 text-right font-medium">Остаток, м²</th>
                   <th className="px-4 py-3 text-right font-medium">Резерв</th>
@@ -128,7 +147,6 @@ export default function InventoryPage() {
                       <td className="px-4 py-3 text-muted">{FORMAT_LABELS[inv.product?.format ?? ''] ?? inv.product?.format}</td>
                       <td className="px-4 py-3 text-muted">{inv.product?.collection ?? '—'}</td>
                       <td className="px-4 py-3 text-muted">{inv.product?.color ?? '—'}</td>
-                      <td className="px-4 py-3 text-muted">{inv.product?.surface ?? '—'}</td>
                       <td className="px-4 py-3">
                         <span className={cn('chip text-[11px] font-semibold', GRADE_CLASS[inv.grade] ?? 'bg-slate-500/15 text-muted')}>
                           {GRADE_LABELS[inv.grade] ?? inv.grade}

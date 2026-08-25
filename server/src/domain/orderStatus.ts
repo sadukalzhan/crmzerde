@@ -57,15 +57,10 @@ export function isOrderStatus(value: unknown): value is OrderStatus {
 /** Колонки канбана, релевантные роли (в порядке цикла). */
 export function kanbanStatusesForRole(role: Role): OrderStatus[] {
   switch (role) {
-    case 'FACTORY':
-      return ['RESERVATION', 'PRODUCTION', 'READY'];
     case 'WAREHOUSE':
       return ['DOCS_CONFIRMED', 'RESERVATION', 'PRODUCTION', 'READY', 'SHIPMENT'];
-    case 'LOGIST':
-      return ['READY', 'SHIPMENT', 'DELIVERY'];
-    case 'ACCOUNTANT':
-      return ['AWAITING_PAYMENT', 'REJECTED', 'POSTPAYMENT', 'DOCS_CONFIRMED'];
     case 'MANAGER':
+    case 'SALES_HEAD':
     case 'ADMIN':
     default:
       return [...ORDER_STATUSES];

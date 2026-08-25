@@ -14,39 +14,39 @@ const T = (to: OrderStatus, roles: Role[]): Transition => ({ to, roles });
 export const TRANSITIONS: Record<OrderStatus, Transition[]> = {
   // Регламент, п. 1-2: заявка принята → менеджер сразу проверяет остатки и резервы.
   NEW: [
-    T('SPEC_PREPARATION', ['MANAGER']),
-    T('REJECTED', ['MANAGER']),
+    T('SPEC_PREPARATION', ['MANAGER', 'SALES_HEAD']),
+    T('REJECTED', ['MANAGER', 'SALES_HEAD']),
   ],
   REJECTED: [T('SPEC_PREPARATION', ['MANAGER'])], // возврат в работу
   SPEC_PREPARATION: [
-    T('SIGNING', ['MANAGER']),
-    T('REJECTED', ['MANAGER']),
+    T('SIGNING', ['MANAGER', 'SALES_HEAD']),
+    T('REJECTED', ['MANAGER', 'SALES_HEAD']),
   ],
   SIGNING: [
-    T('AWAITING_PAYMENT', ['MANAGER']), // аванс
-    T('DOCS_CONFIRMED', ['MANAGER']), // постоплата одобрена
+    T('AWAITING_PAYMENT', ['MANAGER', 'SALES_HEAD']), // аванс
+    T('DOCS_CONFIRMED', ['MANAGER', 'SALES_HEAD']), // постоплата одобрена
   ],
-  AWAITING_PAYMENT: [T('DOCS_CONFIRMED', ['ACCOUNTANT', 'MANAGER'])],
-  DOCS_CONFIRMED: [T('RESERVATION', ['WAREHOUSE', 'MANAGER'])],
+  AWAITING_PAYMENT: [T('DOCS_CONFIRMED', ['MANAGER', 'SALES_HEAD'])],
+  DOCS_CONFIRMED: [T('RESERVATION', ['WAREHOUSE', 'MANAGER', 'SALES_HEAD'])],
   RESERVATION: [
     T('READY', ['WAREHOUSE']), // полное наличие
-    T('PRODUCTION', ['WAREHOUSE', 'MANAGER']), // нет / частично → производство
-    T('SHIPMENT', ['WAREHOUSE', 'MANAGER']), // зарезервировано полностью
+    T('PRODUCTION', ['WAREHOUSE', 'MANAGER', 'SALES_HEAD']), // нет / частично → производство
+    T('SHIPMENT', ['WAREHOUSE', 'MANAGER', 'SALES_HEAD']), // зарезервировано полностью
   ],
-  PRODUCTION: [T('READY', ['FACTORY'])],
-  READY: [T('SHIPMENT', ['WAREHOUSE', 'MANAGER'])],
-  SHIPMENT: [T('DELIVERY', ['LOGIST', 'MANAGER'])],
-  DELIVERY: [T('AWAITING_DOCS', ['LOGIST', 'MANAGER'])],
+  PRODUCTION: [T('READY', ['WAREHOUSE', 'MANAGER', 'SALES_HEAD'])],
+  READY: [T('SHIPMENT', ['WAREHOUSE', 'MANAGER', 'SALES_HEAD'])],
+  SHIPMENT: [T('DELIVERY', ['MANAGER', 'SALES_HEAD'])],
+  DELIVERY: [T('AWAITING_DOCS', ['MANAGER', 'SALES_HEAD'])],
   AWAITING_DOCS: [
-    T('CLAIM', ['MANAGER', 'CLIENT']),
-    T('POSTPAYMENT', ['MANAGER']),
-    T('CLOSED', ['MANAGER']),
+    T('CLAIM', ['MANAGER', 'SALES_HEAD', 'CLIENT']),
+    T('POSTPAYMENT', ['MANAGER', 'SALES_HEAD']),
+    T('CLOSED', ['MANAGER', 'SALES_HEAD']),
   ],
   CLAIM: [
-    T('AWAITING_DOCS', ['MANAGER']), // возврат в цикл после разбора
-    T('CLOSED', ['MANAGER']),
+    T('AWAITING_DOCS', ['MANAGER', 'SALES_HEAD']), // возврат в цикл после разбора
+    T('CLOSED', ['MANAGER', 'SALES_HEAD']),
   ],
-  POSTPAYMENT: [T('CLOSED', ['ACCOUNTANT', 'MANAGER'])],
+  POSTPAYMENT: [T('CLOSED', ['MANAGER', 'SALES_HEAD'])],
   CLOSED: [],
 };
 

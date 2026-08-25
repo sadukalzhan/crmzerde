@@ -10,11 +10,9 @@ import type { Role } from '../lib/types';
 
 const DEMO: { label: string; email: string; pass: string }[] = [
   { label: 'Админ', email: 'admin@crm.kz', pass: 'admin123' },
+  { label: 'Рук. продаж', email: 'head@crm.kz', pass: 'head123' },
   { label: 'Менеджер', email: 'manager@crm.kz', pass: 'manager123' },
-  { label: 'Завод', email: 'factory@crm.kz', pass: 'factory123' },
   { label: 'Склад', email: 'warehouse@crm.kz', pass: 'warehouse123' },
-  { label: 'Логист', email: 'logist@crm.kz', pass: 'logist123' },
-  { label: 'Бухгалтер', email: 'accountant@crm.kz', pass: 'accountant123' },
   { label: 'Клиент', email: 'client@crm.kz', pass: 'client123' },
 ];
 

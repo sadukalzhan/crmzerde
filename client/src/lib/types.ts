@@ -27,6 +27,8 @@ export interface AvailabilityLine {
   name: string;
   needed: number;
   free: number;
+  /** Сколько уже закреплено резервом под эту заявку. */
+  reserved: number;
   covered: number;
   shortage: number;
   reservedBy: ReservationHolder[];

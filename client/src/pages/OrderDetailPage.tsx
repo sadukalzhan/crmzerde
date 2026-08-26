@@ -21,7 +21,7 @@ import { boxes, pallets } from '../lib/packaging';
 import { useAuth } from '../lib/store';
 import { cn } from '../lib/cn';
 import { useQueryClient } from '@tanstack/react-query';
-import type { AvailabilityLine, Order, OrderStatus } from '../lib/types';
+import type { AvailabilityLine, Order, OrderItem, OrderStatus } from '../lib/types';
 
 const DOC_TYPE_OPTIONS = ['TTN', 'UPD', 'ACT', 'INVOICE', 'OTHER'];
 
@@ -244,9 +244,15 @@ export default function OrderDetailPage() {
                         <div className="text-sm font-medium text-slate-100">{line.name}</div>
                         <div className="text-xs text-muted">{line.grade}</div>
                       </div>
-                      <div className="flex gap-4 text-xs">
+                      <div className="flex flex-wrap gap-4 text-xs">
                         <span className="text-muted">Нужно: <b className="text-slate-200">{fmtM2(line.needed)}</b></span>
+                        {line.reserved > 0 && (
+                          <span className="text-muted">В резерве: <b className="text-mint">{fmtM2(line.reserved)}</b></span>
+                        )}
                         <span className="text-muted">Свободно: <b className="text-slate-200">{fmtM2(line.free)}</b></span>
+                        {/* Нехватка показывается только когда она есть: свой резерв
+                            её закрывает, и раньше зарезервированный товар выглядел
+                            как недостача. */}
                         {line.shortage > 0 && (
                           <span className="text-rose-300">Нехватка: <b>{fmtM2(line.shortage)}</b></span>
                         )}
@@ -613,6 +619,7 @@ export default function OrderDetailPage() {
         open={specOpen}
         onClose={() => setSpecOpen(false)}
         products={products}
+        orderItems={order.items}
         onCreate={(payload) =>
           createSpec.mutate(
             { orderId: order.id, ...payload },
@@ -816,11 +823,12 @@ interface SpecItemRow {
 }
 
 function SpecModal({
-  open, onClose, products, onCreate, defaultNumber,
+  open, onClose, products, orderItems, onCreate, defaultNumber,
 }: {
   open: boolean;
   onClose: () => void;
   products: { id: string; name: string; format?: string; inventory?: { grade: string }[] }[];
+  orderItems: OrderItem[];
   onCreate: (p: Record<string, unknown>) => void;
   defaultNumber: string;
 }) {
@@ -832,9 +840,20 @@ function SpecModal({
   const [includesVat, setIncludesVat] = useState(true);
   // Поставка и сроки заданы регламентом — показываем, но не даём вводить.
   const [paymentTerms, setPaymentTerms] = useState('PREPAYMENT');
-  const [rows, setRows] = useState<SpecItemRow[]>([
-    { productId: '', name: '', format: '60x60', toneCaliber: '', quantity: 1, price: 0 },
-  ]);
+  // Номенклатуру, сорт и объём берём из заявки — они уже согласованы,
+  // менеджеру остаётся проставить цены.
+  const [rows, setRows] = useState<SpecItemRow[]>(
+    orderItems.length
+      ? orderItems.map((it) => ({
+          productId: it.productId,
+          name: it.product?.name ?? '',
+          format: it.product?.format ?? '60x60',
+          toneCaliber: it.grade,
+          quantity: it.quantity,
+          price: 0,
+        }))
+      : [{ productId: '', name: '', format: '60x60', toneCaliber: '', quantity: 1, price: 0 }],
+  );
 
   /** Сорта, которые фактически лежат на складе по этому товару. */
   const gradesOf = (productId: string) =>
@@ -932,14 +951,31 @@ function SpecModal({
                   <option key={g} value={g}>{g}</option>
                 ))}
               </select>
-              <input className="input w-20" type="number" min={0} step="0.001" value={r.quantity} onChange={(e) => setRow(i, { quantity: Number(e.target.value) })} />
-              <input className="input w-24" type="number" min={0} value={r.price} onChange={(e) => setRow(i, { price: Number(e.target.value) })} />
+              <input
+                className="input w-20"
+                type="number"
+                min={0}
+                step="0.001"
+                placeholder="0"
+                value={r.quantity || ''}
+                onChange={(e) => setRow(i, { quantity: Number(e.target.value) })}
+              />
+              {/* Пустая строка вместо нуля: иначе ввод дописывается к нулю — «0500». */}
+              <input
+                className="input w-24"
+                type="number"
+                min={0}
+                placeholder="0"
+                value={r.price || ''}
+                onChange={(e) => setRow(i, { price: Number(e.target.value) })}
+              />
               {/* Сумма считается автоматически, но её можно переписать вручную. */}
               <input
                 className="input w-28"
                 type="number"
                 min={0}
-                value={r.sum ?? Math.round(r.quantity * r.price * 100) / 100}
+                placeholder="0"
+                value={r.sum ?? (Math.round(r.quantity * r.price * 100) / 100 || '')}
                 onChange={(e) => setRow(i, { sum: Number(e.target.value) })}
               />
               <button className="btn-ghost px-2 py-2" onClick={() => setRows((rs) => rs.filter((_, idx) => idx !== i))}><Trash2 size={15} /></button>
@@ -974,7 +1010,8 @@ function SpecModal({
         </label>
 
         <div className="flex justify-end border-t border-border pt-3 text-sm">
-          <span className="text-muted">Итого:&nbsp;</span><span className="font-bold text-white">{fmtMoney(total)}</span>
+          <span className="text-muted">Итого:&nbsp;</span>
+          <span className="font-bold text-white">{fmtMoney(total, currency)}</span>
         </div>
       </div>
     </Modal>

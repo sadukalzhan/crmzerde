@@ -111,7 +111,10 @@ export default function OrderFormPage() {
                         <select className="input" value={r.grade} onChange={(e) => setRow(i, { grade: e.target.value })}>
                           {gradesOf(r.productId).length === 0 && <option value="">— нет на складе —</option>}
                           {gradesOf(r.productId).map((g) => (
-                            <option key={g.grade} value={g.grade}>{g.grade} · {fmtM2(g.free)}</option>
+                            <option key={g.grade} value={g.grade}>
+                              {/* Клиенту показываем только сорт, без складского объёма. */}
+                              {isClient ? g.grade : `${g.grade} · ${fmtM2(g.free)}`}
+                            </option>
                           ))}
                         </select>
                       </div>

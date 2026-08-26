@@ -161,10 +161,19 @@ export async function availabilityFor(orderId: string) {
     orderBy: { createdAt: 'asc' },
   });
 
+  // Собственные резервы заявки. Свободный остаток на складе их уже вычел,
+  // поэтому без этой поправки уже зарезервированный товар выглядел бы как
+  // нехватка: «нужно 900, свободно 36, нехватка 864» при полном резерве.
+  const own = await prisma.reservation.findMany({ where: { orderId } });
+
   const lines = order.items.map((item) => {
     const inv = item.product.inventory.find((x) => x.grade === item.grade);
     const free = inv ? inv.quantity - inv.reserved : 0;
-    const shortage = Math.max(0, item.quantity - free);
+    const reserved = own
+      .filter((r) => r.productId === item.productId && r.grade === item.grade)
+      .reduce((sum, r) => sum + r.quantity, 0);
+    // Не хватает лишь того, что не закрыто ни своим резервом, ни свободным остатком.
+    const shortage = Math.max(0, item.quantity - reserved - free);
 
     const reservedBy = holders
       .filter((r) => r.productId === item.productId && r.grade === item.grade)
@@ -188,7 +197,8 @@ export async function availabilityFor(orderId: string) {
       name: item.product.name,
       needed: item.quantity,
       free,
-      covered: Math.min(free, item.quantity),
+      reserved,
+      covered: Math.min(reserved + free, item.quantity),
       shortage,
       reservedBy,
     };

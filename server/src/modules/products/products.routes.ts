@@ -12,14 +12,26 @@ router.use(authenticate);
 // Номенклатуру видят все авторизованные (нужна при создании заявки).
 router.get(
   '/',
-  asyncHandler(async (_req, res) => {
-    res.json(
-      await prisma.product.findMany({
-        where: { isActive: true },
-        include: { inventory: true },
-        orderBy: { name: 'asc' },
-      }),
-    );
+  asyncHandler(async (req, res) => {
+    const products = await prisma.product.findMany({
+      where: { isActive: true },
+      include: { inventory: true },
+      orderBy: { name: 'asc' },
+    });
+
+    // Клиенту складские объёмы не показываем — только то, какие сорта бывают:
+    // без этого он выбирал бы сорт, видя наш остаток.
+    if (req.user!.role === 'CLIENT') {
+      res.json(
+        products.map((p) => ({
+          ...p,
+          inventory: p.inventory.map((i) => ({ id: i.id, productId: i.productId, grade: i.grade })),
+        })),
+      );
+      return;
+    }
+
+    res.json(products);
   }),
 );
 

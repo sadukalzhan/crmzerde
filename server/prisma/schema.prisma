@@ -210,15 +210,22 @@ model Specification {
   total   Float   @default(0)
 
   // Печатная форма: шапка и условия. Заполняются при создании спецификации.
-  contractNumber  String?
-  contractDate    DateTime?
-  city            String    @default("г. Актобе")
-  issuedAt        DateTime  @default(now())
-  currency        String    @default("KZT") // KZT | RUB
-  includesVat     Boolean   @default(true)
-  deliveryTerms   String? // условия поставки
-  shipmentTerms   String? // сроки отгрузки
-  paymentTerms    String? // условия оплаты
+  contractNumber String?
+  contractDate   DateTime?
+  city           String    @default("г. Актобе")
+  issuedAt       DateTime  @default(now())
+  currency       String    @default("KZT") // KZT | RUB
+  includesVat    Boolean   @default(true)
+  deliveryTerms  String? // условия поставки
+  shipmentTerms  String? // сроки отгрузки
+  paymentTerms   String? // PREPAYMENT | POSTPAYMENT
+
+  // Подписанные сканы. Спецификация становится двусторонней не по галочке,
+  // а по факту: продавец скачивает PDF, подписывает с печатью и выкладывает
+  // скан; клиент скачивает его, подписывает со своей стороны и выкладывает.
+  managerFileUrl String?
+  clientFileUrl  String?
+
   managerSigned   Boolean   @default(false)
   managerSignedAt DateTime?
   clientSigned    Boolean   @default(false)

@@ -11,7 +11,7 @@ import { StatusTracker } from '../components/StatusTracker';
 import {
   useOrder, useMeta, useProducts, useTransition, useUpdatePayment,
   useAvailability, useReleaseReservation,
-  useUploadDocument, useSignSpec, useCreateSpec, useCreateContract, useSignContract, useUpdateClaim,
+  useUploadDocument, useCreateSpec, useCreateContract, useSignContract, useUpdateClaim,
   useCreateClaim, useUpdateOrder, useDeleteOrder, useUsers,  useCarriers,
 } from '../lib/queries';
 import { api, apiError, fileHref } from '../lib/api';
@@ -42,7 +42,6 @@ export default function OrderDetailPage() {
   const releaseReservation = useReleaseReservation();
   const updatePayment = useUpdatePayment();
   const uploadDoc = useUploadDocument();
-  const signSpec = useSignSpec();
   const createSpec = useCreateSpec();
   const createContract = useCreateContract();
   const signContract = useSignContract();
@@ -87,6 +86,28 @@ export default function OrderDetailPage() {
     } catch (e) {
       toast.error(apiError(e));
     }
+  };
+
+  // Подпись = выложенный скан: скачал PDF, подписал с печатью, загрузил обратно.
+  const specFileRef = useRef<HTMLInputElement>(null);
+  const [signingSpecId, setSigningSpecId] = useState<string | null>(null);
+
+  const uploadSignedSpec = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !signingSpecId) return;
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      await api.post(`/specifications/${signingSpecId}/upload-signed`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('Подписанная спецификация выложена');
+      qc.invalidateQueries();
+    } catch (err) {
+      toast.error(apiError(err));
+    }
+    setSigningSpecId(null);
+    if (specFileRef.current) specFileRef.current.value = '';
   };
 
   const move = (to: OrderStatus) => {
@@ -300,6 +321,7 @@ export default function OrderDetailPage() {
               ) : undefined
             }
           >
+            <input ref={specFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={uploadSignedSpec} />
             {!order.specifications?.length ? (
               <EmptyState title="Нет спецификаций" />
             ) : (
@@ -320,12 +342,25 @@ export default function OrderDetailPage() {
                       >
                         <Download size={13} /> PDF
                       </button>
-                      {(((user.role === 'MANAGER' || user.role === 'SALES_HEAD') && !sp.managerSigned) || (user.role === 'CLIENT' && !sp.clientSigned)) && (
+                      {/* Скан с подписью и печатью — то, что реально имеет силу. */}
+                      {(sp.clientFileUrl || sp.managerFileUrl) && (
+                        <a
+                          href={fileHref(sp.clientFileUrl || sp.managerFileUrl || '')}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn-soft px-2.5 py-1 text-xs"
+                          title="Подписанный скан"
+                        >
+                          <Download size={13} /> Скан
+                        </a>
+                      )}
+                      {(((user.role === 'MANAGER' || user.role === 'SALES_HEAD' || user.role === 'ADMIN') && !sp.managerSigned) ||
+                        (user.role === 'CLIENT' && sp.managerSigned && !sp.clientSigned)) && (
                         <button
-                          onClick={() => signSpec.mutate(sp.id, { onSuccess: () => toast.success('Подписано') })}
+                          onClick={() => { setSigningSpecId(sp.id); specFileRef.current?.click(); }}
                           className="btn-primary px-2.5 py-1 text-xs"
                         >
-                          <PenLine size={13} /> Подписать
+                          <Upload size={13} /> Выложить подписанную
                         </button>
                       )}
                     </div>
@@ -786,7 +821,7 @@ function SpecModal({
 }: {
   open: boolean;
   onClose: () => void;
-  products: { id: string; name: string; format?: string }[];
+  products: { id: string; name: string; format?: string; inventory?: { grade: string }[] }[];
   onCreate: (p: Record<string, unknown>) => void;
   defaultNumber: string;
 }) {
@@ -796,12 +831,15 @@ function SpecModal({
   const [contractDate, setContractDate] = useState('');
   const [currency, setCurrency] = useState('KZT');
   const [includesVat, setIncludesVat] = useState(true);
-  const [deliveryTerms, setDeliveryTerms] = useState('');
-  const [shipmentTerms, setShipmentTerms] = useState('');
-  const [paymentTerms, setPaymentTerms] = useState('');
+  // Поставка и сроки заданы регламентом — показываем, но не даём вводить.
+  const [paymentTerms, setPaymentTerms] = useState('PREPAYMENT');
   const [rows, setRows] = useState<SpecItemRow[]>([
     { productId: '', name: '', format: '60x60', toneCaliber: '', quantity: 1, price: 0 },
   ]);
+
+  /** Сорта, которые фактически лежат на складе по этому товару. */
+  const gradesOf = (productId: string) =>
+    (products.find((p) => p.id === productId)?.inventory ?? []).map((inv) => inv.grade);
 
   const setRow = (i: number, patch: Partial<SpecItemRow>) =>
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -826,9 +864,7 @@ function SpecModal({
                 contractDate: contractDate || undefined,
                 currency,
                 includesVat,
-                deliveryTerms: deliveryTerms || undefined,
-                shipmentTerms: shipmentTerms || undefined,
-                paymentTerms: paymentTerms || undefined,
+                paymentTerms,
                 items: rows.filter((r) => r.name && r.quantity > 0),
               })
             }
@@ -860,7 +896,7 @@ function SpecModal({
         <div className="space-y-2">
           <div className="hidden gap-2 text-[11px] uppercase text-muted-2 sm:flex">
             <span className="flex-1">Номенклатура</span>
-            <span className="w-24">Тон/калибр</span>
+            <span className="w-40">Сорт (тон/калибр)</span>
             <span className="w-20">Кол-во м²</span>
             <span className="w-24">Цена за м²</span>
             <span className="w-28">Сумма</span>
@@ -874,14 +910,29 @@ function SpecModal({
                   value={r.productId}
                   onChange={(e) => {
                     const p = products.find((x) => x.id === e.target.value);
-                    setRow(i, { productId: e.target.value, name: p?.name ?? '', format: p?.format ?? '60x60' });
+                    setRow(i, {
+                      productId: e.target.value,
+                      name: p?.name ?? '',
+                      format: p?.format ?? '60x60',
+                      toneCaliber: gradesOf(e.target.value)[0] ?? '',
+                    });
                   }}
                 >
                   <option value="">Выберите номенклатуру</option>
                   {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
-              <input className="input w-24" placeholder="B, A3" value={r.toneCaliber ?? ''} onChange={(e) => setRow(i, { toneCaliber: e.target.value })} />
+              {/* Тон/калибр не пишется руками: это сорт со склада по этой позиции. */}
+              <select
+                className="input w-40"
+                value={r.toneCaliber ?? ''}
+                onChange={(e) => setRow(i, { toneCaliber: e.target.value })}
+              >
+                {gradesOf(r.productId).length === 0 && <option value="">— нет на складе —</option>}
+                {gradesOf(r.productId).map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
               <input className="input w-20" type="number" min={0} step="0.001" value={r.quantity} onChange={(e) => setRow(i, { quantity: Number(e.target.value) })} />
               <input className="input w-24" type="number" min={0} value={r.price} onChange={(e) => setRow(i, { price: Number(e.target.value) })} />
               {/* Сумма считается автоматически, но её можно переписать вручную. */}
@@ -905,13 +956,16 @@ function SpecModal({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label="Условия поставки">
-            <input className="input" value={deliveryTerms} onChange={(e) => setDeliveryTerms(e.target.value)} placeholder="Самовывоз DAP до станции Костанай" />
+            <input className="input" value="Самовывоз" readOnly disabled />
           </Field>
           <Field label="Сроки отгрузки">
-            <input className="input" value={shipmentTerms} onChange={(e) => setShipmentTerms(e.target.value)} placeholder="14 календарных дней" />
+            <input className="input" value="до 30 календарных дней" readOnly disabled />
           </Field>
           <Field label="Условия оплаты">
-            <input className="input" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="60 дней отсрочка платежа" />
+            <select className="input" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)}>
+              <option value="PREPAYMENT">100% предварительная оплата</option>
+              <option value="POSTPAYMENT">Постоплата</option>
+            </select>
           </Field>
         </div>
 

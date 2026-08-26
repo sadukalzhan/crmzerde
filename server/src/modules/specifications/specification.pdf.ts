@@ -4,6 +4,7 @@ import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 import { sellerLines, SELLER } from '../../domain/company';
 import { amountInWords } from '../../domain/numberToWords';
 import { FORMAT_LABELS } from '../../domain/packaging';
+import { SPEC_PAYMENT_LABELS } from '../../domain/specTerms';
 
 const MONTHS = [
   'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
@@ -112,7 +113,11 @@ export function buildSpecificationPdf(s: SpecPdfInput): TDocumentDefinitions {
   if (s.includesVat) conditions.push({ text: 'Сумма включает НДС' });
   if (s.deliveryTerms) conditions.push({ text: `Условия поставки: ${s.deliveryTerms}` });
   if (s.shipmentTerms) conditions.push({ text: `Сроки отгрузки: ${s.shipmentTerms}` });
-  if (s.paymentTerms) conditions.push({ text: `Условия оплаты: ${s.paymentTerms}` });
+  if (s.paymentTerms) {
+    // В базе хранится код условия — в документе печатаем формулировку.
+    const label = SPEC_PAYMENT_LABELS[s.paymentTerms] ?? s.paymentTerms;
+    conditions.push({ text: `Условия оплаты: ${label}` });
+  }
 
   const contractLine = s.contractNumber
     ? `к договору №${s.contractNumber}${s.contractDate ? ` от ${longDate(s.contractDate)}` : ''}`

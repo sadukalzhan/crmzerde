@@ -243,17 +243,6 @@ export const useSpecifications = (orderId?: string) =>
     queryFn: async () => (await api.get<Specification[]>('/specifications', { params: orderId ? { orderId } : {} })).data,
   });
 
-export const useSignSpec = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => (await api.post(`/specifications/${id}/sign`)).data,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['specifications'] });
-      qc.invalidateQueries({ queryKey: ['order'] });
-    },
-  });
-};
-
 export const useCreateSpec = () => {
   const qc = useQueryClient();
   return useMutation({

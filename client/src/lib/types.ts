@@ -130,6 +130,9 @@ export interface DocumentItem {
 }
 
 export interface Specification {
+  /** Скан, подписанный продавцом, и скан с подписями обеих сторон. */
+  managerFileUrl?: string | null;
+  clientFileUrl?: string | null;
   id: string;
   number: string;
   total: number;

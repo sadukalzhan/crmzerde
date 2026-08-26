@@ -5,11 +5,13 @@ import { attachment } from '../../lib/download';
 import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validateBody } from '../../middleware/validate';
-import { ApiError, asyncHandler, forbidden } from '../../middleware/error';
+import { ApiError, asyncHandler, badRequest, forbidden } from '../../middleware/error';
 import { notify } from '../../lib/notify';
 import { renderPdf } from '../../lib/pdf';
 import { buildSpecificationPdf } from './specification.pdf';
 import { boxes as calcBoxes, pallets as calcPallets } from '../../domain/packaging';
+import { DELIVERY_TERMS, SHIPMENT_TERMS, SPEC_PAYMENT_TERMS } from '../../domain/specTerms';
+import { upload, fileUrl, deleteFile } from '../../lib/storage';
 
 const router = Router();
 router.use(authenticate);
@@ -59,9 +61,8 @@ router.post(
       city: z.string().optional(),
       currency: z.enum(['KZT', 'RUB']).default('KZT'),
       includesVat: z.boolean().default(true),
-      deliveryTerms: z.string().optional(),
-      shipmentTerms: z.string().optional(),
-      paymentTerms: z.string().optional(),
+      // Поставка и сроки фиксированы регламентом, менеджер выбирает оплату.
+      paymentTerms: z.enum(SPEC_PAYMENT_TERMS).default('PREPAYMENT'),
       items: z
         .array(
           z.object({
@@ -121,15 +122,20 @@ router.post(
         city: req.body.city || undefined,
         currency: req.body.currency,
         includesVat: req.body.includesVat,
-        deliveryTerms: req.body.deliveryTerms,
-        shipmentTerms: req.body.shipmentTerms,
+        deliveryTerms: DELIVERY_TERMS,
+        shipmentTerms: SHIPMENT_TERMS,
         paymentTerms: req.body.paymentTerms,
         total,
-        managerSigned: true,
-        managerSignedAt: new Date(),
         items: { create: items },
       },
       include: { items: true },
+    });
+
+    // Условие оплаты — одно и то же решение для спецификации и заявки:
+    // от него зависит, пустят ли заявку в отгрузку без поступившей оплаты.
+    await prisma.order.update({
+      where: { id: req.body.orderId },
+      data: { paymentTerm: req.body.paymentTerms },
     });
 
     // Уведомить клиента — нужна подпись.
@@ -139,7 +145,7 @@ router.post(
         userId: order.client.userId,
         type: 'SIGNATURE',
         title: `Спецификация по заявке #${order.number}`,
-        body: 'Требуется ваша подпись',
+        body: 'Менеджер подпишет и выложит скан — после этого потребуется ваша подпись',
         orderId: order.id,
       });
     }
@@ -147,34 +153,66 @@ router.post(
   }),
 );
 
-// Подпись: менеджер или клиент (по своей заявке).
+/**
+ * Выкладывание подписанного скана. Продавец подписывает первым: скачивает PDF,
+ * ставит подпись и печать, загружает обратно. Затем то же делает клиент —
+ * поверх файла продавца. Двусторонней спецификация считается только когда
+ * выложены оба скана: галочка в интерфейсе документом не является.
+ */
 router.post(
-  '/:id/sign',
+  '/:id/upload-signed',
+  upload.single('file'),
   asyncHandler(async (req, res) => {
-    const spec = await prisma.specification.findUniqueOrThrow({ where: { id: req.params.id }, include: { order: true } });
+    if (!req.file) throw badRequest('Файл не передан');
+    const spec = await prisma.specification.findUniqueOrThrow({
+      where: { id: req.params.id },
+      include: { order: true },
+    });
     const role = req.user!.role;
+    const url = fileUrl(req.file.filename);
 
-    const data: { managerSigned?: boolean; managerSignedAt?: Date; clientSigned?: boolean; clientSignedAt?: Date } = {};
-    if (role === 'MANAGER' || role === 'ADMIN') {
-      data.managerSigned = true;
-      data.managerSignedAt = new Date();
+    if (role === 'MANAGER' || role === 'SALES_HEAD' || role === 'ADMIN') {
+      await prisma.specification.update({
+        where: { id: spec.id },
+        data: { managerFileUrl: url, managerSigned: true, managerSignedAt: new Date() },
+      });
+      if (spec.order.clientId) {
+        const client = await prisma.client.findUnique({ where: { id: spec.order.clientId } });
+        if (client?.userId) {
+          await notify({
+            userId: client.userId,
+            type: 'SIGNATURE',
+            title: `Спецификация №${spec.number} подписана продавцом`,
+            body: 'Скачайте файл, подпишите со своей стороны и загрузите обратно',
+            orderId: spec.orderId,
+          });
+        }
+      }
     } else if (role === 'CLIENT') {
       await assertOrderAccess(spec.orderId, req.user!.id, role);
-      data.clientSigned = true;
-      data.clientSignedAt = new Date();
-      // Уведомить менеджера о подписи клиента.
+      if (!spec.managerSigned) {
+        deleteFile(req.file.filename);
+        throw badRequest('Сначала спецификацию подписывает продавец');
+      }
+      await prisma.specification.update({
+        where: { id: spec.id },
+        data: { clientFileUrl: url, clientSigned: true, clientSignedAt: new Date() },
+      });
       if (spec.order.managerId) {
         await notify({
           userId: spec.order.managerId,
           type: 'SIGNATURE',
-          title: `Клиент подписал спецификацию #${spec.number}`,
+          title: `Клиент подписал спецификацию №${spec.number}`,
+          body: 'Спецификация двусторонняя — заявку можно вести к отгрузке',
           orderId: spec.orderId,
         });
       }
     } else {
+      deleteFile(req.file.filename);
       throw forbidden();
     }
-    res.json(await prisma.specification.update({ where: { id: spec.id }, data, include: { items: true } }));
+
+    res.json(await prisma.specification.findUniqueOrThrow({ where: { id: spec.id }, include: { items: true } }));
   }),
 );
 

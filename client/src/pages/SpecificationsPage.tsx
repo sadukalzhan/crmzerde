@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, X, FileText } from 'lucide-react';
 import { Page, PageHeader } from '../components/PageHeader';
 import { PageLoader, EmptyState } from '../components/ui';
-import { useSpecifications, useContracts, useSignSpec, useSignContract } from '../lib/queries';
+import { useSpecifications, useContracts, useSignContract } from '../lib/queries';
 import { fmtDate, fmtMoney } from '../lib/format';
 import { toast } from '../components/toast';
 import { useAuth } from '../lib/store';
@@ -25,7 +25,6 @@ export default function SpecificationsPage() {
 
   const { data: specs = [], isLoading: l1 } = useSpecifications();
   const { data: contracts = [], isLoading: l2 } = useContracts();
-  const signSpec = useSignSpec();
   const signContract = useSignContract();
 
   if (l1 || l2) return <PageLoader />;
@@ -62,10 +61,9 @@ export default function SpecificationsPage() {
                 <span className="ml-auto flex items-center gap-2">
                   <SignChip label="Менеджер" signed={sp.managerSigned} />
                   <SignChip label="Клиент" signed={sp.clientSigned} />
+                  {/* Подписывают выкладыванием скана — это делается на карточке заявки. */}
                   {canSign && !sp.managerSigned && (
-                    <button onClick={() => signSpec.mutate(sp.id, { onSuccess: () => toast.success('Подписано') })} className="btn-primary px-2.5 py-1 text-xs">
-                      Подписать
-                    </button>
+                    <span className="text-xs text-muted-2">ждёт подписи продавца</span>
                   )}
                 </span>
               </div>

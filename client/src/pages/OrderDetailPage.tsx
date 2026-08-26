@@ -60,6 +60,9 @@ export default function OrderDetailPage() {
   const [claimText, setClaimText] = useState('');
   const [adminEdit, setAdminEdit] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
+  // Подпись = выложенный скан: скачал PDF, подписал с печатью, загрузил обратно.
+  const specFileRef = useRef<HTMLInputElement>(null);
+  const [signingSpecId, setSigningSpecId] = useState<string | null>(null);
 
   if (isLoading || !meta) return <PageLoader />;
   if (isError || !order)
@@ -87,10 +90,6 @@ export default function OrderDetailPage() {
       toast.error(apiError(e));
     }
   };
-
-  // Подпись = выложенный скан: скачал PDF, подписал с печатью, загрузил обратно.
-  const specFileRef = useRef<HTMLInputElement>(null);
-  const [signingSpecId, setSigningSpecId] = useState<string | null>(null);
 
   const uploadSignedSpec = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

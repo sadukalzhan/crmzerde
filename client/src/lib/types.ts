@@ -240,8 +240,6 @@ export interface Meta {
   formats: Format[];
   formatLabels: Record<string, string>;
   formatSpecs: Record<string, { m2PerBox: number; boxesPerPallet: number; m2PerTile: number; maxTilesPerPallet: number }>;
-  grades: Grade[];
-  gradeLabels: Record<string, string>;
   documentTypes: Record<string, string>;
 }
 

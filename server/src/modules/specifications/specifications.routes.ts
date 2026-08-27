@@ -136,6 +136,10 @@ router.post(
         shipmentTerms: SHIPMENT_TERMS,
         paymentTerms: req.body.paymentTerms,
         total,
+        // Печать и подпись продавца уже стоят в печатной форме, поэтому
+        // со стороны продавца спецификация подписана с момента создания.
+        managerSigned: true,
+        managerSignedAt: new Date(),
         items: { create: items },
       },
       include: { items: true },
@@ -155,7 +159,7 @@ router.post(
         userId: order.client.userId,
         type: 'SIGNATURE',
         title: `Спецификация по заявке #${order.number}`,
-        body: 'Менеджер подпишет и выложит скан — после этого потребуется ваша подпись',
+        body: 'Скачайте PDF, подпишите со своей стороны и загрузите обратно',
         orderId: order.id,
       });
     }

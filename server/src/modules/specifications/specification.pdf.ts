@@ -5,6 +5,7 @@ import { sellerLines, SELLER } from '../../domain/company';
 import { amountInWords } from '../../domain/numberToWords';
 import { FORMAT_LABELS } from '../../domain/packaging';
 import { SPEC_PAYMENT_LABELS } from '../../domain/specTerms';
+import { SELLER_STAMP_DATA_URL } from '../../assets/sellerStamp';
 
 const MONTHS = [
   'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
@@ -159,8 +160,22 @@ export function buildSpecificationPdf(s: SpecPdfInput): TDocumentDefinitions {
       },
       {
         columns: [
-          { width: '*', stack: [{ text: `Директор: ${SELLER.director}  ______________`, margin: [0, 14, 0, 0], fontSize: 8 }, { text: 'М.П.', fontSize: 8, margin: [0, 6, 0, 0] }] },
-          { width: '*', stack: [{ text: `Директор: ${s.dealer.director ?? ''}  ______________`, margin: [0, 14, 0, 0], fontSize: 8 }, { text: 'М.П.', fontSize: 8, margin: [0, 6, 0, 0] }] },
+          {
+            width: '*',
+            stack: [
+              { text: `Директор: ${SELLER.director}`, margin: [0, 14, 0, 0], fontSize: 8 },
+              // Печать и подпись продавца проставляются сразу: документ уходит
+              // клиенту уже подписанным с нашей стороны.
+              { image: SELLER_STAMP_DATA_URL, width: 132, margin: [0, 4, 0, 0] },
+            ],
+          },
+          {
+            width: '*',
+            stack: [
+              { text: `Директор: ${s.dealer.director ?? ''}  ______________`, margin: [0, 14, 0, 0], fontSize: 8 },
+              { text: 'М.П.', fontSize: 8, margin: [0, 40, 0, 0] },
+            ],
+          },
         ],
         columnGap: 24,
       },

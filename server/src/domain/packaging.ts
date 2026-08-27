@@ -32,22 +32,33 @@ const noBox = (grade: string) => {
   return head === 'C' || head === 'С' || head.startsWith('БРАК') || head === 'BRAK';
 };
 
-/** Кол-во коробок. На C и Брак коробки не используются → 0. Округление вверх. */
-export function boxes(m2: number, format: string, grade: string): number {
+/**
+ * Упаковка считается как при отгрузке: сначала набираются полные поддоны,
+ * остаток едет отдельными коробками. Поэтому 2,8 м² — это 0 поддонов и
+ * 2 коробки, а 936 м² — 20 поддонов и 10 коробок сверху, а не 21 поддон.
+ */
+function split(m2: number, format: string, grade: string): { pallets: number; boxes: number } {
   const spec = FORMAT_SPECS[format];
-  if (!spec || m2 <= 0 || noBox(grade)) return 0;
-  return Math.ceil(m2 / spec.m2PerBox);
+  if (!spec || m2 <= 0) return { pallets: 0, boxes: 0 };
+
+  if (noBox(grade)) {
+    // C и брак едут без коробок — только поддонами, остаток тоже занимает поддон.
+    return { pallets: Math.ceil(m2 / spec.m2PerTile / spec.maxTilesPerPallet), boxes: 0 };
+  }
+
+  const totalBoxes = Math.ceil(m2 / spec.m2PerBox);
+  const fullPallets = Math.floor(totalBoxes / spec.boxesPerPallet);
+  return { pallets: fullPallets, boxes: totalBoxes - fullPallets * spec.boxesPerPallet };
 }
 
-/** Кол-во поддонов. Всегда округление вверх (частичный поддон = поддон). */
+/** Коробки сверх полных поддонов. На C и браке коробок нет. */
+export function boxes(m2: number, format: string, grade: string): number {
+  return split(m2, format, grade).boxes;
+}
+
+/** Полные поддоны. */
 export function pallets(m2: number, format: string, grade: string): number {
-  const spec = FORMAT_SPECS[format];
-  if (!spec || m2 <= 0) return 0;
-  if (noBox(grade)) {
-    // C/Брак: считаем через плитки на поддоне
-    return Math.ceil(m2 / spec.m2PerTile / spec.maxTilesPerPallet);
-  }
-  return Math.ceil(boxes(m2, format, grade) / spec.boxesPerPallet);
+  return split(m2, format, grade).pallets;
 }
 
 export interface Packaging {

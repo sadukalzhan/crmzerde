@@ -16,7 +16,6 @@ export { SEED_VERSION } from './seed-version';
 async function reset() {
   await prisma.notification.deleteMany();
   await prisma.orderHistory.deleteMany();
-  await prisma.claim.deleteMany();
   await prisma.reservation.deleteMany();
   await prisma.productionPlanItem.deleteMany();
   await prisma.productionPlan.deleteMany();

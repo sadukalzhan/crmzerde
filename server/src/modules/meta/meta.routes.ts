@@ -5,7 +5,6 @@ import { TRANSITIONS } from '../../domain/transitions';
 import {
   PAYMENT_TERM_LABELS,
   PAYMENT_STATUS_LABELS,
-  PRIORITY_LABELS,
 } from '../../domain/businessRules';
 import {
   FORMATS,
@@ -25,17 +24,9 @@ router.get('/', (_req, res) => {
     transitions: TRANSITIONS,
     paymentTermLabels: PAYMENT_TERM_LABELS,
     paymentStatusLabels: PAYMENT_STATUS_LABELS,
-    priorityLabels: PRIORITY_LABELS,
     formats: FORMATS,
     formatLabels: FORMAT_LABELS,
     formatSpecs: FORMAT_SPECS,
-    documentTypes: {
-      TTN: 'ТТН',
-      UPD: 'УПД',
-      ACT: 'Акт выполненных работ',
-      INVOICE: 'Счёт',
-      OTHER: 'Другое',
-    },
   });
 });
 

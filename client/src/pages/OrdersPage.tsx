@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Plus } from 'lucide-react';
 import { Page, PageHeader } from '../components/PageHeader';
 import { PageLoader, EmptyState } from '../components/ui';
-import { StatusBadge, PriorityDot } from '../components/badges';
+import { StatusBadge, } from '../components/badges';
 import { useMeta, useOrders } from '../lib/queries';
 import { fmtDate, fmtVolume } from '../lib/format';
 import { useAuth } from '../lib/store';
@@ -16,13 +16,11 @@ export default function OrdersPage() {
   const { data: meta } = useMeta();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const [priority, setPriority] = useState('');
   const [page, setPage] = useState(1);
 
   const { data: orders = [], isLoading } = useOrders({
     search: search || undefined,
     status: status || undefined,
-    priority: priority || undefined,
   });
 
   const paged = useMemo(() => orders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [orders, page]);
@@ -59,12 +57,6 @@ export default function OrdersPage() {
           <option value="">Все статусы</option>
           {meta.orderStatuses.map((s) => <option key={s} value={s}>{meta.statusMeta[s].label}</option>)}
         </select>
-        <select className="input w-40" value={priority} onChange={(e) => { setPriority(e.target.value); setPage(1); }}>
-          <option value="">Все приоритеты</option>
-          <option value="HIGH">Высокий</option>
-          <option value="MEDIUM">Средний</option>
-          <option value="LOW">Низкий</option>
-        </select>
       </div>
 
       {orders.length === 0 ? (
@@ -82,7 +74,6 @@ export default function OrdersPage() {
                   <th className="hidden px-4 py-3 font-medium lg:table-cell">Маршрут</th>
                   <th className="px-4 py-3 font-medium">Статус</th>
                   <th className="hidden px-4 py-3 font-medium sm:table-cell">Дата</th>
-                  <th className="px-4 py-3 font-medium">Приор.</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -99,7 +90,6 @@ export default function OrdersPage() {
                     <td className="hidden whitespace-nowrap px-4 py-3 text-muted lg:table-cell">{o.route ?? '—'}</td>
                     <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
                     <td className="hidden whitespace-nowrap px-4 py-3 text-muted sm:table-cell">{fmtDate(o.createdAt)}</td>
-                    <td className="px-4 py-3"><PriorityDot priority={o.priority} /></td>
                   </tr>
                 ))}
               </tbody>

@@ -6,13 +6,13 @@ import {
 } from 'lucide-react';
 import { Page } from '../components/PageHeader';
 import { PageLoader, EmptyState, Modal, Field } from '../components/ui';
-import { StatusBadge, PriorityDot, RoleBadge, ProductionPriorityBadge } from '../components/badges';
+import { StatusBadge, RoleBadge } from '../components/badges';
 import { StatusTracker } from '../components/StatusTracker';
 import {
   useOrder, useMeta, useProducts, useTransition, useUpdatePayment,
   useAvailability, useReleaseReservation,
-  useUploadDocument, useCreateSpec, useCreateContract, useSignContract, useUpdateClaim,
-  useCreateClaim, useUpdateOrder, useDeleteOrder, useUsers,  useCarriers,
+  useUploadDocument, useCreateSpec, useCreateContract, useSignContract,
+  useUpdateOrder, useDeleteOrder, useUsers, useCarriers,
 } from '../lib/queries';
 import { api, apiError, fileHref } from '../lib/api';
 import { toast } from '../components/toast';
@@ -23,7 +23,6 @@ import { cn } from '../lib/cn';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AvailabilityLine, Order, OrderItem, OrderStatus } from '../lib/types';
 
-const DOC_TYPE_OPTIONS = ['TTN', 'UPD', 'ACT', 'INVOICE', 'OTHER'];
 
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -45,19 +44,14 @@ export default function OrderDetailPage() {
   const createSpec = useCreateSpec();
   const createContract = useCreateContract();
   const signContract = useSignContract();
-  const updateClaim = useUpdateClaim();
-  const createClaim = useCreateClaim();
   const updateOrder = useUpdateOrder();
   const deleteOrder = useDeleteOrder();
   const isAdmin = user.role === 'ADMIN';
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const [docType, setDocType] = useState('TTN');
   const [reject, setReject] = useState(false);
   const [reason, setReason] = useState('');
   const [specOpen, setSpecOpen] = useState(false);
-  const [claimOpen, setClaimOpen] = useState(false);
-  const [claimText, setClaimText] = useState('');
   const [adminEdit, setAdminEdit] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   // Подпись = выложенный скан: скачал PDF, подписал с печатью, загрузил обратно.
@@ -124,7 +118,7 @@ export default function OrderDetailPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     uploadDoc.mutate(
-      { orderId: order.id, type: docType, file },
+      { orderId: order.id, file },
       {
         onSuccess: () => toast.success('Документ загружен'),
         onError: (err) => toast.error(apiError(err)),
@@ -154,8 +148,6 @@ export default function OrderDetailPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-white">Заявка #{order.number}</h1>
               <StatusBadge status={order.status} />
-              <PriorityDot priority={order.priority} withLabel />
-              <ProductionPriorityBadge value={order.productionPriority} />
             </div>
             <p className="mt-1 text-sm text-muted">
               {order.client.companyName}
@@ -347,16 +339,28 @@ export default function OrderDetailPage() {
                       >
                         <Download size={13} /> PDF
                       </button>
-                      {/* Скан с подписью и печатью — то, что реально имеет силу. */}
-                      {(sp.clientFileUrl || sp.managerFileUrl) && (
+                      {/* Обе стороны видят обе подписанные версии: клиент скачивает
+                          файл продавца, продавец — вернувшийся файл клиента. */}
+                      {sp.managerFileUrl && (
                         <a
-                          href={fileHref(sp.clientFileUrl || sp.managerFileUrl || '')}
+                          href={fileHref(sp.managerFileUrl)}
                           target="_blank"
                           rel="noreferrer"
                           className="btn-soft px-2.5 py-1 text-xs"
-                          title="Подписанный скан"
+                          title="Скан с подписью продавца"
                         >
-                          <Download size={13} /> Скан
+                          <Download size={13} /> От продавца
+                        </a>
+                      )}
+                      {sp.clientFileUrl && (
+                        <a
+                          href={fileHref(sp.clientFileUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn-soft px-2.5 py-1 text-xs"
+                          title="Скан с подписью клиента"
+                        >
+                          <Download size={13} /> От клиента
                         </a>
                       )}
                       {(((user.role === 'MANAGER' || user.role === 'SALES_HEAD' || user.role === 'ADMIN') && !sp.managerSigned) ||
@@ -411,11 +415,7 @@ export default function OrderDetailPage() {
             title="Документы"
             action={
               <div className="flex items-center gap-2">
-                <select className="input h-8 w-28 py-1 text-xs" value={docType} onChange={(e) => setDocType(e.target.value)}>
-                  {DOC_TYPE_OPTIONS.filter((t) => isStaff || t === 'ACT').map((t) => (
-                    <option key={t} value={t}>{meta.documentTypes[t]}</option>
-                  ))}
-                </select>
+                {/* Тип документа не выбирается — на отгрузке просто выкладывают файлы. */}
                 <input ref={fileRef} type="file" className="hidden" onChange={onUpload} />
                 <button onClick={() => fileRef.current?.click()} className="btn-soft px-3 py-1.5 text-xs" disabled={uploadDoc.isPending}>
                   <Upload size={14} /> Загрузить
@@ -424,13 +424,12 @@ export default function OrderDetailPage() {
             }
           >
             {!order.documents?.length ? (
-              <EmptyState title="Документов нет" hint="ТТН, УПД, акт, счёт" />
+              <EmptyState title="Документов нет" hint="Отгрузочные документы" />
             ) : (
               <div className="space-y-2">
                 {order.documents.map((d) => (
                   <div key={d.id} className="flex items-center justify-between rounded-lg border border-border bg-bg-elevated px-3 py-2.5">
                     <div className="flex items-center gap-2">
-                      <span className="chip bg-accent/15 text-accent">{meta.documentTypes[d.type] ?? d.type}</span>
                       <span className="text-sm text-slate-200">{d.name}</span>
                     </div>
                     <a href={fileHref(d.fileUrl)} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-accent hover:underline">
@@ -441,30 +440,6 @@ export default function OrderDetailPage() {
               </div>
             )}
           </Section>
-
-          {/* Рекламации */}
-          {!!order.claims?.length && (
-            <Section title="Рекламации">
-              <div className="space-y-2">
-                {order.claims.map((cl) => (
-                  <div key={cl.id} className="rounded-lg border border-border bg-bg-elevated p-3">
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="chip bg-rose-500/15 text-rose-300">{cl.status}</span>
-                      <span className="text-xs text-muted-2">{fmtDate(cl.createdAt)}</span>
-                    </div>
-                    <p className="text-sm text-slate-200">{cl.description}</p>
-                    {(user.role === 'MANAGER' || user.role === 'ADMIN') && cl.status !== 'RESOLVED' && (
-                      <div className="mt-2 flex gap-2">
-                        <button onClick={() => updateClaim.mutate({ id: cl.id, status: 'RESOLVED' }, { onSuccess: () => toast.success('Рекламация решена') })} className="btn-soft px-2.5 py-1 text-xs">
-                          Решить
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
 
           {/* История */}
           <Section title="История переходов" icon={<HistoryIcon size={16} />}>
@@ -508,14 +483,6 @@ export default function OrderDetailPage() {
                     {meta.statusMeta[tr.to].label}
                   </button>
                 ))
-              )}
-              {user.role === 'CLIENT' && (
-                <button
-                  onClick={() => { setClaimOpen(true); setClaimText(''); }}
-                  className="btn-ghost w-full !text-rose-300 hover:!bg-rose-500/10"
-                >
-                  <AlertTriangle size={16} /> Подать рекламацию
-                </button>
               )}
               {isAdmin && (
                 <>
@@ -626,42 +593,7 @@ export default function OrderDetailPage() {
             { onSuccess: () => { toast.success('Спецификация создана'); setSpecOpen(false); }, onError: (e) => toast.error(apiError(e)) },
           )
         }
-        defaultNumber={`СП-${order.number}`}
       />
-
-      {/* Модал рекламации */}
-      <Modal
-        open={claimOpen}
-        onClose={() => setClaimOpen(false)}
-        title={`Рекламация по заявке #${order.number}`}
-        footer={
-          <>
-            <button className="btn-ghost" onClick={() => setClaimOpen(false)}>Отмена</button>
-            <button
-              className="btn-primary"
-              onClick={() =>
-                claimText.trim().length >= 5
-                  ? createClaim.mutate(
-                      { orderId: order.id, description: claimText },
-                      { onSuccess: () => { toast.success('Рекламация отправлена'); setClaimOpen(false); }, onError: (e) => toast.error(apiError(e)) },
-                    )
-                  : toast.error('Опишите проблему подробнее')
-              }
-            >
-              Отправить
-            </button>
-          </>
-        }
-      >
-        <Field label="Опишите проблему">
-          <textarea
-            className="input min-h-[100px] resize-none"
-            value={claimText}
-            onChange={(e) => setClaimText(e.target.value)}
-            placeholder="Например: повреждение части паллет при доставке…"
-          />
-        </Field>
-      </Modal>
 
       {/* Админ: удаление */}
       <Modal
@@ -703,7 +635,6 @@ function AdminEditModal({ order, onClose }: { order: Order; onClose: () => void 
   const { data: carriers = [] } = useCarriers();
   const managers = users.filter((u) => u.role === 'MANAGER' || u.role === 'SALES_HEAD');
   const [form, setForm] = useState({
-    priority: order.priority,
     managerId: order.manager?.id ?? '',
     carrierId: order.carrier?.id ?? '',
     selfPickup: order.selfPickup,
@@ -716,7 +647,6 @@ function AdminEditModal({ order, onClose }: { order: Order; onClose: () => void 
       {
         id: order.id,
         data: {
-          priority: form.priority,
           managerId: form.managerId || null,
           carrierId: form.selfPickup ? null : form.carrierId || null,
           selfPickup: form.selfPickup,
@@ -736,13 +666,6 @@ function AdminEditModal({ order, onClose }: { order: Order; onClose: () => void 
       footer={<><button className="btn-ghost" onClick={onClose}>Отмена</button><button className="btn-primary" onClick={save}>Сохранить</button></>}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field label="Приоритет">
-          <select className="input" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as Order['priority'] })}>
-            <option value="HIGH">Высокий</option>
-            <option value="MEDIUM">Средний</option>
-            <option value="LOW">Низкий</option>
-          </select>
-        </Field>
         <Field label="Менеджер">
           <select className="input" value={form.managerId} onChange={(e) => setForm({ ...form, managerId: e.target.value })}>
             <option value="">Не назначен</option>
@@ -823,16 +746,14 @@ interface SpecItemRow {
 }
 
 function SpecModal({
-  open, onClose, products, orderItems, onCreate, defaultNumber,
+  open, onClose, products, orderItems, onCreate,
 }: {
   open: boolean;
   onClose: () => void;
   products: { id: string; name: string; format?: string; inventory?: { grade: string }[] }[];
   orderItems: OrderItem[];
   onCreate: (p: Record<string, unknown>) => void;
-  defaultNumber: string;
 }) {
-  const [number, setNumber] = useState(defaultNumber);
   // Шапка и условия печатной формы — заполняются здесь, на согласовании.
   const [contractNumber, setContractNumber] = useState('');
   const [contractDate, setContractDate] = useState('');
@@ -877,7 +798,6 @@ function SpecModal({
             className="btn-primary"
             onClick={() =>
               onCreate({
-                number,
                 contractNumber: contractNumber || undefined,
                 contractDate: contractDate || undefined,
                 currency,
@@ -893,10 +813,7 @@ function SpecModal({
       }
     >
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Field label="Номер спецификации">
-            <input className="input" value={number} onChange={(e) => setNumber(e.target.value)} />
-          </Field>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Field label="Номер договора">
             <input className="input" value={contractNumber} onChange={(e) => setContractNumber(e.target.value)} placeholder="KSN-0003" />
           </Field>

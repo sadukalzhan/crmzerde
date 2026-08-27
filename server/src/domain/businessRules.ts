@@ -28,7 +28,6 @@ export function productionPriority(paymentTerm: string, paymentStatus: string): 
 
 export const PAYMENT_TERMS = ['PREPAYMENT', 'POSTPAYMENT'] as const;
 export const PAYMENT_STATUSES = ['UNPAID', 'PARTIAL', 'PAID', 'POSTPAY_APPROVED'] as const;
-export const PRIORITIES = ['HIGH', 'MEDIUM', 'LOW'] as const;
 
 export const PAYMENT_TERM_LABELS: Record<string, string> = {
   PREPAYMENT: 'Аванс',
@@ -42,11 +41,6 @@ export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   POSTPAY_APPROVED: 'Постоплата одобрена',
 };
 
-export const PRIORITY_LABELS: Record<string, string> = {
-  HIGH: 'Высокий',
-  MEDIUM: 'Средний',
-  LOW: 'Низкий',
-};
 
 /** Срок ожидания акта от клиента (дней), после которого менеджеру шлётся напоминание. */
 export const ACT_REMINDER_DAYS = 3;

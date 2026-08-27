@@ -23,7 +23,6 @@ export const orderDetailInclude = {
   documents: { include: { uploadedBy: { select: { id: true, fullName: true } } } },
   reservations: { include: { product: true } },
   productionPlanItems: { include: { plan: true } },
-  claims: { orderBy: { createdAt: 'desc' as const } },
   history: {
     include: { actor: { select: { id: true, fullName: true, role: true } } },
     orderBy: { createdAt: 'desc' as const },
@@ -32,7 +31,7 @@ export const orderDetailInclude = {
 
 async function nextOrderNumber(): Promise<number> {
   const last = await prisma.order.findFirst({ orderBy: { number: 'desc' }, select: { number: true } });
-  return last ? last.number + 1 : 233;
+  return last ? last.number + 1 : 1;
 }
 
 function buildRoute(shipFrom?: string | null, shipTo?: string | null): string | null {
@@ -57,7 +56,6 @@ export interface CreateOrderInput {
   managerId?: string;
   carrierId?: string;
   selfPickup?: boolean;
-  priority?: string;
   paymentTerm?: string;
   shipFrom?: string;
   shipTo?: string;
@@ -80,10 +78,6 @@ export async function createOrder(input: CreateOrderInput, actor: AuthUser) {
   if (!client) throw notFound('Клиент не найден');
   if (!input.items?.length) throw badRequest('Добавьте хотя бы одну позицию');
 
-  // Приоритет заявки выставляют только менеджеры. Клиент, даже если пришлёт
-  // поле в запросе, получает средний приоритет по умолчанию.
-  const priority = actor.role === 'CLIENT' ? 'MEDIUM' : input.priority ?? 'MEDIUM';
-
   const totalQty = input.items.reduce((s, i) => s + i.quantity, 0);
   const number = await nextOrderNumber();
   const selfPickup = input.selfPickup ?? false;
@@ -92,7 +86,6 @@ export async function createOrder(input: CreateOrderInput, actor: AuthUser) {
     data: {
       number,
       status: 'NEW',
-      priority,
       paymentTerm: input.paymentTerm ?? 'PREPAYMENT',
       quantity: totalQty,
       unit: 'M2',
@@ -333,8 +326,7 @@ export async function addToProductionPlan(orderId: string, actor: AuthUser) {
           orderItemId: s.item.id,
           grade: s.grade,
           quantity: produceQty,
-          priority,
-          status: 'PLANNED',
+              status: 'PLANNED',
           startDate,
         },
       });
@@ -344,7 +336,7 @@ export async function addToProductionPlan(orderId: string, actor: AuthUser) {
 
   await prisma.order.update({
     where: { id: orderId },
-    data: { productionStartDate: startDate, productionPriority: priority },
+    data: { productionStartDate: startDate },
   });
 
   await notifyRole('WAREHOUSE', {
@@ -426,10 +418,6 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
       if (docs.length === 0) {
         throw badRequest('Загрузите отгрузочные документы перед завершением заявки');
       }
-      const openClaim = await prisma.claim.findFirst({
-        where: { orderId, status: { in: ['OPEN', 'IN_REVIEW'] } },
-      });
-      if (openClaim) throw badRequest('Есть открытая рекламация — закрыть заявку нельзя');
       data.closedAt = new Date();
       data.closedBy = { connect: { id: actor.id } };
       break;
@@ -561,7 +549,7 @@ export async function updatePayment(orderId: string, status: string, actor: Auth
   if (!order) throw notFound('Заявка не найдена');
 
   const priority = productionPriority(order.paymentTerm, status);
-  await prisma.order.update({ where: { id: orderId }, data: { paymentStatus: status, productionPriority: priority } });
+  await prisma.order.update({ where: { id: orderId }, data: { paymentStatus: status } });
   await prisma.productionPlanItem.updateMany({ where: { orderId }, data: { priority } });
   await recordHistory(orderId, order.status, order.status, actor.id, `Оплата: ${status}`);
   emitBoardChanged({ reason: 'payment', orderId });
@@ -582,7 +570,6 @@ export async function listOrders(actor: AuthUser, filters: Record<string, string
   }
 
   if (filters.status && isOrderStatus(filters.status)) where.status = filters.status;
-  if (filters.priority) where.priority = filters.priority;
   if (filters.carrierId) where.carrierId = filters.carrierId;
   if (filters.clientId && actor.role !== 'CLIENT') where.clientId = filters.clientId;
   if (filters.search) {

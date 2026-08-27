@@ -38,7 +38,6 @@ model User {
   ordersClosed      Order[]              @relation("OrderCloser")
   historyEntries    OrderHistory[]       @relation("HistoryActor")
   documentsUploaded Document[]           @relation("DocUploader")
-  claimsCreated     Claim[]              @relation("ClaimCreator")
   reservationsMade  Reservation[]        @relation("ReservationCreator")
   notifications     Notification[]
   resetTokens       PasswordResetToken[]
@@ -88,7 +87,6 @@ model Client {
   manager   User?   @relation("ClientManager", fields: [managerId], references: [id])
 
   orders Order[]
-  claims Claim[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -130,11 +128,7 @@ model Order {
   id     String @id @default(cuid())
   number Int    @unique // отображается как #233
 
-  status   String @default("NEW") // см. src/domain/orderStatus.ts
-  priority String @default("MEDIUM") // HIGH | MEDIUM | LOW
-
-  // Производственный приоритет: 1 (аванс) выше 2 (постоплата)
-  productionPriority Int?
+  status String @default("NEW") // см. src/domain/orderStatus.ts
 
   paymentTerm   String @default("PREPAYMENT") // PREPAYMENT | POSTPAYMENT
   paymentStatus String @default("UNPAID") // UNPAID | PARTIAL | PAID | POSTPAY_APPROVED
@@ -174,7 +168,6 @@ model Order {
   contracts           Contract[]
   documents           Document[]
   history             OrderHistory[]
-  claims              Claim[]
   productionPlanItems ProductionPlanItem[]
   reservations        Reservation[]
   notifications       Notification[]
@@ -355,21 +348,6 @@ model Reservation {
 // ─────────────────────────────────────────────────────────────────────────────
 // Рекламации, история, уведомления, настройки
 // ─────────────────────────────────────────────────────────────────────────────
-
-model Claim {
-  id          String   @id @default(cuid())
-  orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  clientId    String?
-  client      Client?  @relation(fields: [clientId], references: [id])
-  description String
-  status      String   @default("OPEN") // OPEN | IN_REVIEW | RESOLVED | REJECTED
-  resolution  String?
-  createdById String?
-  createdBy   User?    @relation("ClaimCreator", fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
 
 model OrderHistory {
   id         String   @id @default(cuid())

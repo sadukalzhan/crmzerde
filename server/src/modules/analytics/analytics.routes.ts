@@ -18,11 +18,9 @@ router.get(
     grouped.forEach((g) => (byStatus[g.status] = g._count._all));
 
     const total = grouped.reduce((s, g) => s + g._count._all, 0);
-    const delivered = (byStatus.DELIVERY ?? 0) + (byStatus.AWAITING_DOCS ?? 0) + (byStatus.CLOSED ?? 0);
+    const delivered = (byStatus.SHIPMENT ?? 0) + (byStatus.CLOSED ?? 0);
     const rejected = byStatus.REJECTED ?? 0;
     const inWork = total - rejected - (byStatus.CLOSED ?? 0);
-
-    const byPriority = await prisma.order.groupBy({ by: ['priority'], _count: { _all: true } });
 
     const now = new Date();
     const plan = await prisma.productionPlan.findUnique({
@@ -36,7 +34,6 @@ router.get(
       delivered,
       rejected,
       byStatus,
-      byPriority: Object.fromEntries(byPriority.map((p) => [p.priority, p._count._all])),
       plannedThisMonth: plan?._count.items ?? 0,
     });
   }),

@@ -1,8 +1,7 @@
-import { Factory, MapPin, Calendar, Wallet, Truck } from 'lucide-react';
+import { MapPin, CalendarDays, Wallet, Truck } from 'lucide-react';
 import { useMeta } from '../../lib/queries';
 import { fmtDate, fmtM2 } from '../../lib/format';
 import { boxes, pallets } from '../../lib/packaging';
-import { PriorityDot, ProductionPriorityBadge } from '../badges';
 import type { Order } from '../../lib/types';
 
 export function OrderCard({ order, onClick }: { order: Order; onClick?: () => void }) {
@@ -22,7 +21,6 @@ export function OrderCard({ order, onClick }: { order: Order; onClick?: () => vo
     >
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-bold text-white">#{order.number}</span>
-        <PriorityDot priority={order.priority} />
       </div>
 
       <div className="mb-1 line-clamp-2 text-sm font-medium text-slate-100">
@@ -43,7 +41,7 @@ export function OrderCard({ order, onClick }: { order: Order; onClick?: () => vo
         )}
         {order.shipFrom && (
           <div className="flex items-center gap-1.5">
-            <Factory size={12} className="text-muted-2" />
+            <MapPin size={12} className="text-muted-2" />
             <span>{order.shipFrom}</span>
           </div>
         )}
@@ -57,10 +55,9 @@ export function OrderCard({ order, onClick }: { order: Order; onClick?: () => vo
 
       <div className="mt-2.5 flex items-center justify-between border-t border-border/60 pt-2">
         <span className="flex items-center gap-1 text-[11px] text-muted-2">
-          <Calendar size={12} /> {fmtDate(order.createdAt)}
+          <CalendarDays size={12} /> {fmtDate(order.createdAt)}
         </span>
         <span className="flex items-center gap-1.5">
-          <ProductionPriorityBadge value={order.productionPriority} />
           <span className="flex items-center gap-1 text-[10px] text-muted-2" title="Условие оплаты">
             <Wallet size={11} />
             {meta?.paymentTermLabels?.[order.paymentTerm] ?? order.paymentTerm}

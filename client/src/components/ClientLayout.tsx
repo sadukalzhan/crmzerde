@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Grid2x2, Plus, ClipboardList, LogOut } from 'lucide-react';
+import { Plus, ClipboardList, LogOut } from 'lucide-react';
+import { Logo } from './Logo';
 import { useAuth } from '../lib/store';
 import { useSettings } from '../lib/queries';
 import { useRealtime } from '../lib/useRealtime';
@@ -25,9 +26,7 @@ export function ClientLayout() {
       <header className="sticky top-0 z-30 border-b border-border bg-bg-elevated/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-hover shadow-glow">
-              <Grid2x2 size={18} className="text-white" />
-            </div>
+            <Logo size={34} />
             <span className="text-sm font-bold text-white">{settings?.brandName ?? 'Зерде Керамика Актобе'}</span>
           </div>
 

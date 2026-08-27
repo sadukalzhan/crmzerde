@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Grid2x2 } from 'lucide-react';
+import { Logo } from './Logo';
 import { useSettings } from '../lib/queries';
 
 export function AuthShell({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
@@ -14,9 +14,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
 
       <div className="relative w-full max-w-md">
         <div className="mb-6 flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-accent to-accent-hover shadow-glow">
-            <Grid2x2 size={24} className="text-white" />
-          </div>
+          <Logo size={56} />
           <div className="text-center">
             <div className="text-lg font-bold text-white">{settings?.brandName ?? 'Зерде Керамика Актобе'}</div>
             <div className="text-xs text-muted-2">CRM керамогранитного завода</div>

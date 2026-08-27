@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { Page, PageHeader } from '../components/PageHeader';
 import { StatCard } from '../components/StatCard';
 import { PageLoader, EmptyState } from '../components/ui';
-import { StatusBadge, PriorityDot } from '../components/badges';
+import { StatusBadge } from '../components/badges';
 import { useAnalyticsSummary, useMeta, useOrders } from '../lib/queries';
 import { fmtDate, fmtVolume } from '../lib/format';
 import { useAuth } from '../lib/store';
@@ -76,7 +76,6 @@ export default function DashboardPage() {
               onClick={() => navigate(`/orders/${o.id}`)}
               className="flex w-full items-center gap-3 py-3 text-left transition hover:bg-panel-2/40"
             >
-              <PriorityDot priority={o.priority} />
               <span className="w-14 font-bold text-white">#{o.number}</span>
               <span className="flex-1 truncate text-sm text-slate-200">{o.items?.[0]?.product?.name ?? '—'}</span>
               <span className="hidden text-xs text-muted sm:block">{fmtVolume(o.quantity, o.unit)}</span>

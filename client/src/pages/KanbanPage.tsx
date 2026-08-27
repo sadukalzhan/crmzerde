@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Page, PageHeader } from '../components/PageHeader';
 import { PageLoader } from '../components/ui';
 import { Modal } from '../components/ui';
@@ -21,13 +21,11 @@ export default function KanbanPage() {
   const { data: carriers = [] } = useCarriers();
 
   const [carrierId, setCarrierId] = useState('');
-  const [priority, setPriority] = useState('');
   const now = new Date();
   const [monthFilter, setMonthFilter] = useState<{ year: number; month: number } | null>(null);
 
   const { data: orders = [], isLoading } = useOrders({
     carrierId: carrierId || undefined,
-    priority: priority || undefined,
   });
   const transition = useTransition();
 
@@ -88,11 +86,6 @@ export default function KanbanPage() {
       <PageHeader
         title="Рабочее место"
         subtitle="Канбан-доска заявок — перетаскивайте карточки между этапами"
-        actions={
-          <button onClick={() => navigate('/specifications')} className="btn-soft">
-            <FileUp size={16} /> Загрузить спеки
-          </button>
-        }
       />
 
       {/* Фильтры */}
@@ -102,16 +95,6 @@ export default function KanbanPage() {
             <select className="input" value={carrierId} onChange={(e) => setCarrierId(e.target.value)}>
               <option value="">Все</option>
               {carriers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </Field>
-        </div>
-        <div className="w-40">
-          <Field label="Приоритет">
-            <select className="input" value={priority} onChange={(e) => setPriority(e.target.value)}>
-              <option value="">Все</option>
-              <option value="HIGH">Высокий</option>
-              <option value="MEDIUM">Средний</option>
-              <option value="LOW">Низкий</option>
             </select>
           </Field>
         </div>

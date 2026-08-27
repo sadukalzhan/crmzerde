@@ -6,7 +6,6 @@ import {
   BarChart3,
   Boxes,
   Lock,
-  Calendar,
   Users,
   UserCog,
   Settings,
@@ -53,7 +52,6 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: '/inventory', labelKey: 'nav.inventory', icon: Boxes, roles: STAFF },
       { to: '/reservations', labelKey: 'nav.reservations', icon: Lock, roles: STAFF },
       { to: '/specifications', labelKey: 'nav.specifications', icon: FileText, roles: SALES },
-      { to: '/calendar', labelKey: 'nav.calendar', icon: Calendar, roles: STAFF },
     ],
   },
   {

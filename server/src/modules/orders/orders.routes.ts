@@ -14,7 +14,6 @@ const createSchema = z.object({
   managerId: z.string().optional(),
   carrierId: z.string().optional(),
   selfPickup: z.boolean().optional(),
-  priority: z.enum(['HIGH', 'MEDIUM', 'LOW']).optional(),
   paymentTerm: z.enum(['PREPAYMENT', 'POSTPAYMENT']).optional(),
   shipFrom: z.string().optional(),
   shipTo: z.string().optional(),
@@ -41,7 +40,6 @@ const paymentSchema = z.object({
 });
 
 const updateSchema = z.object({
-  priority: z.enum(['HIGH', 'MEDIUM', 'LOW']).optional(),
   // Условие оплаты менеджер выбирает на этапе согласования.
   paymentTerm: z.enum(['PREPAYMENT', 'POSTPAYMENT']).optional(),
   managerId: z.string().nullable().optional(),
@@ -59,7 +57,6 @@ router.get(
     const f = req.query as Record<string, string | undefined>;
     const orders = await service.listOrders(req.user!, {
       status: f.status,
-      priority: f.priority,
       carrierId: f.carrierId,
       clientId: f.clientId,
       search: f.search,

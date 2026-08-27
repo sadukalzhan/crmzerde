@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Boxes, Plus, Minus, FileSpreadsheet, Upload } from 'lucide-react';
+import { Boxes, Plus, Minus, FileSpreadsheet, Upload, Search, X } from 'lucide-react';
 import { Page, PageHeader } from '../components/PageHeader';
 import { PageLoader, EmptyState, Modal, Field } from '../components/ui';
 import { useInventory } from '../lib/queries';
@@ -12,12 +12,15 @@ import { useAuth } from '../lib/store';
 import { cn } from '../lib/cn';
 import type { Inventory } from '../lib/types';
 
+// Сорт — свободная строка («A, R3, 0»), поэтому цвет берём по первой букве.
 const GRADE_CLASS: Record<string, string> = {
   A: 'bg-emerald-500/15 text-emerald-300',
   B: 'bg-sky-500/15 text-sky-300',
   C: 'bg-amber-500/15 text-amber-300',
-  BRAK: 'bg-rose-500/15 text-rose-300',
+  Б: 'bg-rose-500/15 text-rose-300',
 };
+const gradeClass = (grade: string) =>
+  GRADE_CLASS[grade.trim().charAt(0).toUpperCase()] ?? 'bg-slate-500/15 text-muted';
 
 export default function InventoryPage() {
   const user = useAuth((s) => s.user)!;
@@ -26,9 +29,51 @@ export default function InventoryPage() {
   // Актуальные остатки заливает только админ (шаблон + импорт).
   const canImport = user.role === 'ADMIN';
   const { data: inventory = [], isLoading } = useInventory();
+  // Строк несколько сотен, поэтому поиск и фильтры обязательны.
+  const [search, setSearch] = useState('');
+  const [format, setFormat] = useState('');
+  const [grade, setGrade] = useState('');
+  const [onlyFree, setOnlyFree] = useState(false);
   const [adjust, setAdjust] = useState<Inventory | null>(null);
   const [delta, setDelta] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Сорта и форматы для выпадающих списков — из того, что реально есть на складе.
+  const formats = useMemo(
+    () => [...new Set(inventory.map((i) => i.product?.format).filter(Boolean))].sort() as string[],
+    [inventory],
+  );
+  // Сортов из 1С сотни («A, R3, 0», «A, B4/BI, R3»…), списком по ним не выбрать.
+  // Фильтруем по классу сорта — первой букве; точный тон/калибр ищется поиском.
+  const gradeGroups = useMemo(
+    () => [...new Set(inventory.map((i) => i.grade.trim().charAt(0).toUpperCase()))]
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, 'ru')),
+    [inventory],
+  );
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return inventory.filter((i) => {
+      const free = i.free ?? i.quantity - i.reserved;
+      if (q && !`${i.product?.name ?? ''} ${i.grade}`.toLowerCase().includes(q)) return false;
+      if (format && i.product?.format !== format) return false;
+      if (grade && i.grade.trim().charAt(0).toUpperCase() !== grade) return false;
+      if (onlyFree && free <= 0) return false;
+      return true;
+    });
+  }, [inventory, search, format, grade, onlyFree]);
+
+  const totals = useMemo(
+    () => ({
+      quantity: filtered.reduce((s, i) => s + i.quantity, 0),
+      free: filtered.reduce((s, i) => s + (i.free ?? i.quantity - i.reserved), 0),
+    }),
+    [filtered],
+  );
+
+  const resetFilters = () => { setSearch(''); setFormat(''); setGrade(''); setOnlyFree(false); };
+  const filtersOn = Boolean(search || format || grade || onlyFree);
 
   const onImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -117,8 +162,52 @@ export default function InventoryPage() {
         }
       />
 
+      {/* Поиск и фильтры */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[240px] flex-1">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-2" />
+          <input
+            className="input pl-9"
+            placeholder="Поиск по номенклатуре или сорту, например «ANGARA» или «R3»…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select className="input w-36" value={format} onChange={(e) => setFormat(e.target.value)}>
+          <option value="">Все форматы</option>
+          {formats.map((f) => <option key={f} value={f}>{FORMAT_LABELS[f] ?? f}</option>)}
+        </select>
+        <select className="input w-40" value={grade} onChange={(e) => setGrade(e.target.value)}>
+          <option value="">Все сорта</option>
+          {gradeGroups.map((g) => <option key={g} value={g}>Сорт {g}</option>)}
+        </select>
+        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-panel px-3 py-2 text-sm text-slate-200">
+          <input
+            type="checkbox"
+            checked={onlyFree}
+            onChange={(e) => setOnlyFree(e.target.checked)}
+            className="h-4 w-4 accent-[#A855F7]"
+          />
+          Только свободные
+        </label>
+        {filtersOn && (
+          <button onClick={resetFilters} className="btn-ghost px-3 py-2 text-xs">
+            <X size={14} /> Сбросить
+          </button>
+        )}
+      </div>
+
+      {/* Итог по отфильтрованному — чтобы видеть объём выборки, а не всего склада */}
+      <div className="mb-3 flex flex-wrap gap-4 text-xs text-muted">
+        <span>Строк: <b className="text-slate-200">{filtered.length}</b> из {inventory.length}</span>
+        <span>Остаток: <b className="text-slate-200">{fmtM2(totals.quantity)}</b></span>
+        <span>Свободно: <b className="text-mint">{fmtM2(totals.free)}</b></span>
+      </div>
+
       {inventory.length === 0 ? (
-        <EmptyState title="Нет данных по остаткам" hint="Добавьте номенклатуру в справочниках" icon={<Boxes size={28} />} />
+        <EmptyState title="Нет данных по остаткам" hint="Загрузите остатки импортом из 1С" icon={<Boxes size={28} />} />
+      ) : filtered.length === 0 ? (
+        <EmptyState title="Ничего не найдено" hint="Измените поиск или сбросьте фильтры" icon={<Search size={28} />} />
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
@@ -137,14 +226,14 @@ export default function InventoryPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {inventory.map((inv) => {
+                {filtered.map((inv) => {
                   const free = inv.free ?? inv.quantity - inv.reserved;
                   return (
                     <tr key={inv.id} className="transition hover:bg-panel-2/30">
                       <td className="px-4 py-3 text-slate-200">{inv.product?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-muted">{FORMAT_LABELS[inv.product?.format ?? ''] ?? inv.product?.format}</td>
                       <td className="px-4 py-3">
-                        <span className={cn('chip text-[11px] font-semibold', GRADE_CLASS[inv.grade] ?? 'bg-slate-500/15 text-muted')}>
+                        <span className={cn('chip text-[11px] font-semibold', gradeClass(inv.grade))}>
                           {inv.grade}
                         </span>
                       </td>

@@ -16,6 +16,16 @@ import { upload, fileUrl, deleteFile } from '../../lib/storage';
 const router = Router();
 router.use(authenticate);
 
+/** Сквозная нумерация спецификаций, начиная с первой. */
+async function nextSpecNumber(): Promise<string> {
+  const specs = await prisma.specification.findMany({ select: { number: true } });
+  const max = specs.reduce((m, s) => {
+    const n = parseInt(String(s.number).replace(/\D/g, ''), 10);
+    return Number.isFinite(n) && n > m ? n : m;
+  }, 0);
+  return String(max + 1);
+}
+
 async function assertOrderAccess(orderId: string, userId: string, role: string) {
   if (role === 'CLIENT') {
     const profile = await prisma.client.findUnique({ where: { userId } });
@@ -53,7 +63,7 @@ router.post(
   validateBody(
     z.object({
       orderId: z.string(),
-      number: z.string(),
+      number: z.string().optional(),
       fileUrl: z.string().optional(),
       // Шапка и условия печатной формы.
       contractNumber: z.string().optional(),
@@ -115,7 +125,7 @@ router.post(
     const spec = await prisma.specification.create({
       data: {
         orderId: req.body.orderId,
-        number: req.body.number,
+        number: req.body.number || (await nextSpecNumber()),
         fileUrl: req.body.fileUrl,
         contractNumber: req.body.contractNumber,
         contractDate: req.body.contractDate ? new Date(req.body.contractDate) : null,

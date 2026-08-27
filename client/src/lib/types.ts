@@ -39,7 +39,6 @@ export interface Availability {
   lines: AvailabilityLine[];
 }
 
-export type Priority = 'HIGH' | 'MEDIUM' | 'LOW';
 export type PaymentTerm = 'PREPAYMENT' | 'POSTPAYMENT';
 export type PaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID' | 'POSTPAY_APPROVED';
 export type Unit = 'M2' | 'PALLET';
@@ -156,22 +155,11 @@ export interface Contract {
   order?: { number: number; client?: { companyName: string } };
 }
 
-export interface Claim {
-  id: string;
-  orderId: string;
-  description: string;
-  status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED' | 'REJECTED';
-  resolution?: string | null;
-  createdAt: string;
-  order?: { number: number; client?: { companyName: string } };
-}
 
 export interface Order {
   id: string;
   number: number;
   status: OrderStatus;
-  priority: Priority;
-  productionPriority?: number | null;
   paymentTerm: PaymentTerm;
   paymentStatus: PaymentStatus;
   quantity: number;
@@ -194,7 +182,6 @@ export interface Order {
   contracts?: Contract[];
   documents?: DocumentItem[];
   history?: OrderHistoryEntry[];
-  claims?: Claim[];
   reservations?: { id: string; quantity: number; grade?: Grade; confirmedForShipment?: boolean; product?: Product }[];
   productionPlanItems?: { id: string; priority: number; status: string; plan?: { year: number; month: number } }[];
 }
@@ -238,11 +225,9 @@ export interface Meta {
   transitions: Record<OrderStatus, { to: OrderStatus; roles: Role[] }[]>;
   paymentTermLabels: Record<string, string>;
   paymentStatusLabels: Record<string, string>;
-  priorityLabels: Record<string, string>;
   formats: Format[];
   formatLabels: Record<string, string>;
   formatSpecs: Record<string, { m2PerBox: number; boxesPerPallet: number; m2PerTile: number; maxTilesPerPallet: number }>;
-  documentTypes: Record<string, string>;
 }
 
 export interface AppSettings {

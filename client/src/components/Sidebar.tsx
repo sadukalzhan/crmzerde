@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
-import { LogOut, Grid2x2 } from 'lucide-react';
+import { LogOut } from 'lucide-react';
+import { Logo } from './Logo';
 import { useAuth } from '../lib/store';
 import { useSettings, useOrders } from '../lib/queries';
 import { navSectionsForRole } from './nav';
@@ -23,9 +24,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       {/* Бренд */}
       <div className="px-3 pb-3 pt-4">
         <div className="flex items-center gap-3 rounded-xl border border-border bg-panel px-3 py-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gold shadow-glow">
-            <Grid2x2 size={17} className="text-white" />
-          </div>
+          <Logo size={36} />
           <div className="min-w-0 leading-tight">
             <div className="truncate text-sm font-semibold text-white">
               {settings?.brandName ?? 'Зерде Керамика Актобе'}

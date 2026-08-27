@@ -19,7 +19,6 @@ import SpecificationsPage from './pages/SpecificationsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import InventoryPage from './pages/InventoryPage';
 import ReservationsPage from './pages/ReservationsPage';
-import CalendarPage from './pages/CalendarPage';
 import ClientsPage from './pages/ClientsPage';
 import ProfilePage from './pages/ProfilePage';
 import MyOrdersPage from './pages/MyOrdersPage';
@@ -88,7 +87,6 @@ export default function App() {
             Страница ./pages/ProductionPage и её API остались в коде. */}
         <Route path="/inventory" element={<InventoryPage />} />
         <Route path="/reservations" element={<ReservationsPage />} />
-        <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/admin/users" element={<UsersPage />} />
         <Route path="/admin/refs" element={<RefsPage />} />

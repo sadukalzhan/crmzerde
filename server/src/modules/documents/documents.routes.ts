@@ -7,7 +7,6 @@ import { upload, fileUrl, deleteFile } from '../../lib/storage';
 const router = Router();
 router.use(authenticate);
 
-const DOC_TYPES = ['TTN', 'UPD', 'ACT', 'INVOICE', 'OTHER'] as const;
 
 router.get(
   '/',
@@ -34,19 +33,23 @@ router.post(
   upload.single('file'),
   asyncHandler(async (req, res) => {
     if (!req.file) throw badRequest('Файл не передан');
-    const { orderId, type, name } = req.body as { orderId?: string; type?: string; name?: string };
-    if (!orderId || !type || !DOC_TYPES.includes(type as never)) {
+    const { orderId, name } = req.body as { orderId?: string; name?: string };
+    if (!orderId) {
       deleteFile(req.file.filename);
-      throw badRequest('Укажите orderId и корректный тип документа');
+      throw badRequest('Укажите заявку');
     }
 
-    // Клиент может загружать только АКТ и только по своей заявке.
+    // Тип документа больше не выбирается: на отгрузке менеджер просто
+    // выкладывает файлы, и разбирать их по видам смысла нет.
+    const type = 'OTHER';
+
+    // Клиент может загружать документы только по своей заявке.
     if (req.user!.role === 'CLIENT') {
       const profile = await prisma.client.findUnique({ where: { userId: req.user!.id } });
       const order = await prisma.order.findUnique({ where: { id: orderId } });
-      if (!order || order.clientId !== profile?.id || type !== 'ACT') {
+      if (!order || order.clientId !== profile?.id) {
         deleteFile(req.file.filename);
-        throw forbidden('Клиент может загрузить только акт по своей заявке');
+        throw forbidden('Можно загружать документы только по своей заявке');
       }
     }
 

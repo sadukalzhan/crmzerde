@@ -3,7 +3,6 @@ import { api } from './api';
 import type {
   AppSettings,
   Availability,
-  Claim,
   Client,
   Contract,
   DocumentItem,
@@ -28,7 +27,6 @@ export const useSettings = () =>
 // ── Заявки ──
 export interface OrderFilters {
   status?: string;
-  priority?: string;
   carrierId?: string;
   clientId?: string;
   search?: string;
@@ -294,11 +292,10 @@ export const useDocuments = (orderId?: string) =>
 export const useUploadDocument = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (vars: { orderId: string; type: string; file: File; name?: string }) => {
+    mutationFn: async (vars: { orderId: string; file: File; name?: string }) => {
       const fd = new FormData();
       fd.append('file', vars.file);
       fd.append('orderId', vars.orderId);
-      fd.append('type', vars.type);
       if (vars.name) fd.append('name', vars.name);
       return (await api.post('/documents', fd, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
     },
@@ -310,33 +307,6 @@ export const useUploadDocument = () => {
 };
 
 // ── Рекламации ──
-export const useClaims = (orderId?: string) =>
-  useQuery({
-    queryKey: ['claims', orderId ?? 'all'],
-    queryFn: async () => (await api.get<Claim[]>('/claims', { params: orderId ? { orderId } : {} })).data,
-  });
-
-export const useCreateClaim = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (vars: { orderId: string; description: string }) => (await api.post('/claims', vars)).data,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['claims'] });
-      qc.invalidateQueries({ queryKey: ['order'] });
-      qc.invalidateQueries({ queryKey: ['orders'] });
-    },
-  });
-};
-
-export const useUpdateClaim = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (vars: { id: string; status?: string; resolution?: string }) =>
-      (await api.patch(`/claims/${vars.id}`, { status: vars.status, resolution: vars.resolution })).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['claims'] }),
-  });
-};
-
 // ── Аналитика ──
 export const useAnalyticsSummary = () =>
   useQuery({ queryKey: ['analytics', 'summary'], queryFn: async () => (await api.get('/analytics/summary')).data });

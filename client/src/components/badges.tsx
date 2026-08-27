@@ -1,6 +1,6 @@
 import { useMeta } from '../lib/queries';
 import { cn, hexToRgba } from '../lib/cn';
-import type { OrderStatus, Priority, Role } from '../lib/types';
+import type { OrderStatus, Role } from '../lib/types';
 
 export function StatusBadge({ status }: { status: OrderStatus | string }) {
   const { data: meta } = useMeta();
@@ -36,35 +36,3 @@ export function RoleBadge({ role }: { role: Role }) {
   );
 }
 
-const PRIORITY_COLOR: Record<Priority, string> = {
-  HIGH: '#FF5A5F',
-  MEDIUM: '#FFB020',
-  LOW: '#5C6678',
-};
-
-export function PriorityDot({ priority, withLabel }: { priority: Priority; withLabel?: boolean }) {
-  const { data: meta } = useMeta();
-  const color = PRIORITY_COLOR[priority];
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 8px ${hexToRgba(color, 0.6)}` }} />
-      {withLabel && <span className="text-xs text-muted">{meta?.priorityLabels?.[priority] ?? priority}</span>}
-    </span>
-  );
-}
-
-export function ProductionPriorityBadge({ value }: { value?: number | null }) {
-  if (!value) return null;
-  const isP1 = value === 1;
-  return (
-    <span
-      className={cn(
-        'chip text-[11px] font-semibold ring-1',
-        isP1 ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30' : 'bg-slate-500/15 text-slate-300 ring-slate-500/30',
-      )}
-      title={isP1 ? 'Приоритет 1 — аванс (первая очередь)' : 'Приоритет 2 — постоплата'}
-    >
-      П{value}
-    </span>
-  );
-}

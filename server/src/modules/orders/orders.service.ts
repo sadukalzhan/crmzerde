@@ -76,6 +76,10 @@ export async function createOrder(input: CreateOrderInput, actor: AuthUser) {
 
   const client = await prisma.client.findUnique({ where: { id: clientId } });
   if (!client) throw notFound('Клиент не найден');
+  // Менеджер оформляет заявки только своим контрагентам — закрепление делает админ.
+  if (actor.role === 'MANAGER' && client.managerId !== actor.id) {
+    throw forbidden('Этот контрагент закреплён за другим менеджером');
+  }
   if (!input.items?.length) throw badRequest('Добавьте хотя бы одну позицию');
 
   const totalQty = input.items.reduce((s, i) => s + i.quantity, 0);

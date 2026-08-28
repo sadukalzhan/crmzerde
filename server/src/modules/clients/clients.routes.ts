@@ -4,20 +4,18 @@ import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validateBody } from '../../middleware/validate';
-import { asyncHandler, conflict } from '../../middleware/error';
+import { asyncHandler, conflict, forbidden } from '../../middleware/error';
 
 const router = Router();
 router.use(authenticate);
 
-// Справочник клиентов (сотрудникам). Менеджер видит своих + без менеджера.
+// Справочник контрагентов. Менеджер работает только со своими: закрепление
+// делает админ, поэтому чужие и незакреплённые в его списке не появляются.
 router.get(
   '/',
   requireRole('MANAGER', 'SALES_HEAD', 'WAREHOUSE'),
   asyncHandler(async (req, res) => {
-    const where =
-      req.user!.role === 'MANAGER'
-        ? { OR: [{ managerId: req.user!.id }, { managerId: null }] }
-        : {};
+    const where = req.user!.role === 'MANAGER' ? { managerId: req.user!.id } : {};
     const clients = await prisma.client.findMany({
       where,
       include: { manager: { select: { id: true, fullName: true } }, _count: { select: { orders: true } } },
@@ -31,6 +29,11 @@ router.get(
   '/:id',
   requireRole('MANAGER', 'SALES_HEAD'),
   asyncHandler(async (req, res) => {
+    // Менеджер не должен открывать контрагента, который за ним не закреплён.
+    if (req.user!.role === 'MANAGER') {
+      const own = await prisma.client.findUnique({ where: { id: req.params.id }, select: { managerId: true } });
+      if (own?.managerId !== req.user!.id) throw forbidden('Этот контрагент закреплён за другим менеджером');
+    }
     res.json(
       await prisma.client.findUniqueOrThrow({
         where: { id: req.params.id },

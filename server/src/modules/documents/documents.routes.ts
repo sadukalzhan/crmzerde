@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
 import { asyncHandler, badRequest, forbidden } from '../../middleware/error';
-import { upload, fileUrl, deleteFile } from '../../lib/storage';
+import { upload, fileUrl, deleteFile, decodeOriginalName } from '../../lib/storage';
 
 const router = Router();
 router.use(authenticate);
@@ -57,7 +57,7 @@ router.post(
       data: {
         orderId,
         type,
-        name: name || req.file.originalname,
+        name: name || decodeOriginalName(req.file.originalname),
         fileUrl: fileUrl(req.file.filename),
         uploadedById: req.user!.id,
       },

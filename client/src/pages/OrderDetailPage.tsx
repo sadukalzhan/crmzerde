@@ -14,7 +14,7 @@ import {
   useUploadDocument, useCreateSpec, useCreateContract, useSignContract,
   useUpdateOrder, useDeleteOrder, useUsers, useCarriers,
 } from '../lib/queries';
-import { api, apiError, fileHref } from '../lib/api';
+import { api, apiError, downloadFile } from '../lib/api';
 import { toast } from '../components/toast';
 import { fmtDate, fmtDateTime, fmtMoney, fmtM2 } from '../lib/format';
 import { boxes, pallets } from '../lib/packaging';
@@ -69,6 +69,15 @@ export default function OrderDetailPage() {
   const allowed = (meta.transitions[order.status] ?? []).filter(
     (tr) => user.role === 'ADMIN' || tr.roles.includes(user.role),
   );
+
+  // Файлы отдаются только по токену, поэтому качаем запросом, а не ссылкой.
+  const download = async (fileUrl: string, filename: string) => {
+    try {
+      await downloadFile(fileUrl, filename);
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
 
   // Печатная форма спецификации приходит с сервера готовым PDF.
   const downloadSpecPdf = async (id: string, number: string) => {
@@ -342,26 +351,22 @@ export default function OrderDetailPage() {
                       {/* Обе стороны видят обе подписанные версии: клиент скачивает
                           файл продавца, продавец — вернувшийся файл клиента. */}
                       {sp.managerFileUrl && (
-                        <a
-                          href={fileHref(sp.managerFileUrl)}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          onClick={() => download(sp.managerFileUrl!, `Спецификация ${sp.number} — продавец`)}
                           className="btn-soft px-2.5 py-1 text-xs"
                           title="Скан с подписью продавца"
                         >
                           <Download size={13} /> От продавца
-                        </a>
+                        </button>
                       )}
                       {sp.clientFileUrl && (
-                        <a
-                          href={fileHref(sp.clientFileUrl)}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          onClick={() => download(sp.clientFileUrl!, `Спецификация ${sp.number} — клиент`)}
                           className="btn-soft px-2.5 py-1 text-xs"
                           title="Скан с подписью клиента"
                         >
                           <Download size={13} /> От клиента
-                        </a>
+                        </button>
                       )}
                       {(((user.role === 'MANAGER' || user.role === 'SALES_HEAD' || user.role === 'ADMIN') && !sp.managerSigned) ||
                         (user.role === 'CLIENT' && sp.managerSigned && !sp.clientSigned)) && (
@@ -432,9 +437,9 @@ export default function OrderDetailPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-slate-200">{d.name}</span>
                     </div>
-                    <a href={fileHref(d.fileUrl)} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-accent hover:underline">
+                    <button onClick={() => download(d.fileUrl, d.name)} className="flex items-center gap-1 text-xs text-accent hover:underline">
                       <Download size={14} /> Скачать
-                    </a>
+                    </button>
                   </div>
                 ))}
               </div>

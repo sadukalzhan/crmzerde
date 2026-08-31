@@ -45,6 +45,19 @@ export function apiError(error: unknown, fallback = 'Произошла ошиб
 }
 
 /** Абсолютный URL файла (для скачивания через защищённый эндпоинт). */
-export function fileHref(fileUrl: string): string {
-  return fileUrl.startsWith('http') ? fileUrl : `${API_URL}${fileUrl}`;
+/**
+ * Скачивание защищённого файла. Обычная ссылка <a href> сюда не годится:
+ * браузер не шлёт заголовок Authorization, и сервер отвечает 401. Поэтому
+ * забираем файл запросом с токеном и отдаём его как blob.
+ */
+export async function downloadFile(fileUrl: string, filename: string): Promise<void> {
+  // fileUrl приходит как /api/files/..., а базовый адрес axios уже содержит /api.
+  const path = fileUrl.replace(/^\/api/, '');
+  const res = await api.get(path, { responseType: 'blob' });
+  const objectUrl = URL.createObjectURL(res.data as Blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(objectUrl);
 }

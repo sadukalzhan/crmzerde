@@ -12,15 +12,28 @@ router.use(authenticate);
 router.get(
   '/:name',
   asyncHandler(async (req, res) => {
+    // Express отдаёт параметр уже раскодированным, а в базе ссылка хранится
+    // закодированной — сравнивать надо в том же виде, иначе доступ не находится.
     const name = req.params.name;
-    const url = `/api/files/${name}`;
+    const url = `/api/files/${encodeURIComponent(name)}`;
 
     if (req.user!.role === 'CLIENT') {
       const profile = await prisma.client.findUnique({ where: { userId: req.user!.id } });
-      const doc = await prisma.document.findFirst({
-        where: { fileUrl: url, order: { clientId: profile?.id ?? '__none__' } },
-      });
-      if (!doc) throw forbidden('Нет доступа к файлу');
+      const clientId = profile?.id ?? '__none__';
+
+      // Файл может быть как документом заявки, так и сканом спецификации:
+      // раньше проверялись только документы, и подписанные спецификации
+      // клиенту не отдавались.
+      const [doc, spec] = await Promise.all([
+        prisma.document.findFirst({ where: { fileUrl: url, order: { clientId } } }),
+        prisma.specification.findFirst({
+          where: {
+            OR: [{ managerFileUrl: url }, { clientFileUrl: url }],
+            order: { clientId },
+          },
+        }),
+      ]);
+      if (!doc && !spec) throw forbidden('Нет доступа к файлу');
     }
 
     const abs = filePath(decodeURIComponent(name));

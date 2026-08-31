@@ -13,10 +13,24 @@ if (env.storageDriver === 'local' && !fs.existsSync(env.uploadDir)) {
   fs.mkdirSync(env.uploadDir, { recursive: true });
 }
 
+/**
+ * Multer отдаёт имя файла из multipart как latin1, поэтому русские названия
+ * приезжают кракозябрами («Ð Ð°ÑÐ¸Ð¼Ð¼Ð°.docx»). Возвращаем их в UTF-8.
+ *
+ * Признак искажения — в строке нет ни одного символа выше U+00FF: настоящая
+ * кириллица туда не помещается, а мусор от неверной раскодировки состоит
+ * ровно из таких символов. Уже корректное имя не трогаем.
+ */
+export function decodeOriginalName(name: string): string {
+  if ([...name].some((ch) => ch.codePointAt(0)! > 0xff)) return name;
+  const restored = Buffer.from(name, 'latin1').toString('utf8');
+  return restored.includes('\uFFFD') ? name : restored;
+}
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, env.uploadDir),
   filename: (_req, file, cb) => {
-    const safe = file.originalname.replace(/[^\w.\-а-яА-ЯёЁ]+/g, '_');
+    const safe = decodeOriginalName(file.originalname).replace(/[^\w.\-а-яА-ЯёЁ]+/g, '_');
     const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
     cb(null, `${unique}-${safe}`);
   },

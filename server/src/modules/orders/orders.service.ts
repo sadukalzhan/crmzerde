@@ -263,35 +263,44 @@ async function orderShortages(orderId: string) {
   });
 }
 
-/** Отгрузка: снимаем резерв и списываем остаток по всем позициям. */
-async function consumeStockOnShipment(orderId: string) {
-  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, reservations: true } });
-  if (!order) return;
+/** Освобождает весь резерв заявки, возвращая объём в свободный остаток. */
+async function releaseOrderReservations(orderId: string): Promise<number> {
+  const reservations = await prisma.reservation.findMany({ where: { orderId } });
+  if (!reservations.length) return 0;
   await prisma.$transaction(async (tx) => {
-    // снять резервы
-    for (const r of order.reservations) {
-      const inv = await tx.inventory.findUnique({ where: { productId_grade: { productId: r.productId, grade: r.grade } } });
-      if (inv) await tx.inventory.update({ where: { id: inv.id }, data: { reserved: Math.max(0, inv.reserved - r.quantity) } });
+    for (const r of reservations) {
+      await tx.inventory.updateMany({
+        where: { productId: r.productId, grade: r.grade },
+        data: { reserved: { decrement: r.quantity } },
+      });
     }
     await tx.reservation.deleteMany({ where: { orderId } });
-    // списать остаток по фактически отгруженным позициям
-    for (const item of order.items) {
-      const inv = await tx.inventory.findUnique({ where: { productId_grade: { productId: item.productId, grade: item.grade } } });
-      if (inv) await tx.inventory.update({ where: { id: inv.id }, data: { quantity: Math.max(0, inv.quantity - item.quantity) } });
+  });
+  return reservations.reduce((sum, r) => sum + r.quantity, 0);
+}
+
+/**
+ * Отгрузка: списываем со склада ровно то, что было закреплено за заявкой.
+ * Раньше списывался объём позиции независимо от резерва, а нехватка молча
+ * обрезалась до нуля — склад «уходил в минус» незаметно.
+ */
+async function consumeStockOnShipment(orderId: string) {
+  const reservations = await prisma.reservation.findMany({ where: { orderId } });
+  await prisma.$transaction(async (tx) => {
+    for (const r of reservations) {
+      await tx.inventory.updateMany({
+        where: { productId: r.productId, grade: r.grade },
+        data: { quantity: { decrement: r.quantity }, reserved: { decrement: r.quantity } },
+      });
     }
+    await tx.reservation.deleteMany({ where: { orderId } });
   });
 }
 
 /** Удаление заявки (админ): освобождаем резервы, затем каскадно удаляем. */
 export async function deleteOrder(orderId: string) {
-  const reservations = await prisma.reservation.findMany({ where: { orderId } });
-  await prisma.$transaction(async (tx) => {
-    for (const r of reservations) {
-      const inv = await tx.inventory.findUnique({ where: { productId_grade: { productId: r.productId, grade: r.grade } } });
-      if (inv) await tx.inventory.update({ where: { id: inv.id }, data: { reserved: Math.max(0, inv.reserved - r.quantity) } });
-    }
-    await tx.order.delete({ where: { id: orderId } });
-  });
+  await releaseOrderReservations(orderId);
+  await prisma.order.delete({ where: { id: orderId } });
   emitBoardChanged({ reason: 'deleted', orderId });
 }
 
@@ -384,13 +393,22 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
     case 'REJECTED': {
       if (!input.reason) throw badRequest('Укажите причину отклонения');
       data.rejectionReason = input.reason;
-      note = `Отклонено: ${input.reason}`;
+      // Иначе товар остался бы заперт за отклонённой заявкой навсегда.
+      const freed = await releaseOrderReservations(orderId);
+      note = `Отклонено: ${input.reason}` + (freed > 0 ? ` · освобождено из резерва ${freed} м²` : '');
       break;
     }
     case 'RESERVATION': {
+      // Резервировать нечего — значит и этапа «Резерв» быть не может.
       const avail = await availabilityFor(orderId);
-      await reserveOutstanding(orderId, actor);
-      note = note ?? `Резерв: ${avail.status === 'FULL' ? 'полный' : avail.status === 'PARTIAL' ? 'частичный' : 'нет наличия'}`;
+      if (avail.status === 'NONE') {
+        throw new ApiError(
+          409,
+          'На складе нет свободного остатка ни по одной позиции — резервировать нечего.',
+        );
+      }
+      const reserved = await reserveOutstanding(orderId, actor);
+      note = note ?? `Резерв: ${avail.status === 'FULL' ? 'полный' : 'частичный'}, ${reserved} м²`;
       break;
     }
     case 'SHIPMENT': {
@@ -412,7 +430,18 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
           'Условие «Аванс»: отгрузка возможна только после получения оплаты.',
         );
       }
-      // Отгрузка: снимаем резерв и списываем остаток.
+      // 3) Отгружаем только то, что реально закреплено за заявкой: без полного
+      // резерва отгрузка списала бы со склада товар, которого нет.
+      const shorts = await orderShortages(orderId);
+      const totalShort = shorts.reduce((sum, x) => sum + x.shortage, 0);
+      if (totalShort > 0) {
+        const lines = shorts
+          .filter((x) => x.shortage > 0)
+          .map((x) => `${x.name} (${x.grade}) — не хватает ${x.shortage} м²`)
+          .join('; ');
+        throw new ApiError(409, `Заявка обеспечена резервом не полностью: ${lines}`);
+      }
+
       await consumeStockOnShipment(orderId);
       break;
     }
@@ -446,6 +475,23 @@ export async function transitionOrder(orderId: string, input: TransitionInput, a
   emitBoardChanged({ reason: 'transition', orderId, from, to });
 
   return updated;
+}
+
+/**
+ * Дорезервировать заявку по текущему остатку. Нужна, когда резерв получился
+ * частичным: без неё заявка застревала бы перед отгрузкой, даже когда товар
+ * на склад уже поступил.
+ */
+export async function topUpReservation(orderId: string, actor: AuthUser) {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) throw notFound('Заявка не найдена');
+
+  const added = await reserveOutstanding(orderId, actor);
+  if (added > 0) {
+    await recordHistory(orderId, order.status, order.status, actor.id, `Дорезервировано ${added} м²`);
+    emitBoardChanged({ reason: 'reserved', orderId });
+  }
+  return { added };
 }
 
 // ── Регламент, п. 4-5: работа с чужими резервами ─────────────────────────────

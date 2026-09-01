@@ -10,7 +10,7 @@ import { StatusBadge, RoleBadge } from '../components/badges';
 import { StatusTracker } from '../components/StatusTracker';
 import {
   useOrder, useMeta, useProducts, useTransition, useUpdatePayment,
-  useAvailability, useReleaseReservation,
+  useAvailability, useReleaseReservation, useTopUpReservation,
   useUploadDocument, useCreateSpec, useCreateContract, useSignContract,
   useUpdateOrder, useDeleteOrder, useUsers, useCarriers,
 } from '../lib/queries';
@@ -39,6 +39,7 @@ export default function OrderDetailPage() {
   // Регламент, п. 2-5: проверка остатков и резервов доступна только сотрудникам.
   const { data: availability } = useAvailability(isStaff ? id : undefined);
   const releaseReservation = useReleaseReservation();
+  const topUpReservation = useTopUpReservation();
   const updatePayment = useUpdatePayment();
   const uploadDoc = useUploadDocument();
   const createSpec = useCreateSpec();
@@ -219,6 +220,26 @@ export default function OrderDetailPage() {
             <Section
               title="Остатки и резервы по позициям"
               action={
+                <div className="flex items-center gap-2">
+                  {/* Резерв мог получиться частичным — после поступления товара
+                      его добирают, иначе заявка не пройдёт в отгрузку. */}
+                  {availability.lines.some((l: AvailabilityLine) => l.shortage > 0) &&
+                    (user.role === 'MANAGER' || user.role === 'SALES_HEAD' || user.role === 'ADMIN' || user.role === 'WAREHOUSE') && (
+                      <button
+                        onClick={() =>
+                          topUpReservation.mutate(order.id, {
+                            onSuccess: (r) =>
+                              r.added > 0
+                                ? toast.success(`Дорезервировано ${r.added} м²`)
+                                : toast.info('Свободного остатка пока нет'),
+                            onError: (e) => toast.error(apiError(e)),
+                          })
+                        }
+                        className="btn-soft px-2.5 py-1 text-xs"
+                      >
+                        Дорезервировать
+                      </button>
+                    )}
                 <span
                   className={cn(
                     'chip',
@@ -235,6 +256,7 @@ export default function OrderDetailPage() {
                       ? 'Частично'
                       : 'Нет наличия'}
                 </span>
+                </div>
               }
             >
               <div className="space-y-3">

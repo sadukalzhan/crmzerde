@@ -110,6 +110,15 @@ router.post(
   }),
 );
 
+// Дорезервировать по текущему остатку (после поступления товара на склад).
+router.post(
+  '/:id/reserve',
+  requireRole('MANAGER', 'SALES_HEAD', 'WAREHOUSE'),
+  asyncHandler(async (req, res) => {
+    res.json(await service.topUpReservation(req.params.id, req.user!));
+  }),
+);
+
 // Регламент, п. 4: снять резерв того же клиента и перенести на эту заявку.
 router.post(
   '/:id/reservations/:reservationId/release',

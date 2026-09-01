@@ -88,6 +88,19 @@ export const useAcceptProduction = () => {
   });
 };
 
+export const useTopUpReservation = () => {
+  const qc = useQueryClient();
+  const invalidate = useOrderInvalidator();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.post(`/orders/${id}/reserve`)).data as { added: number },
+    onSuccess: (_d, id) => {
+      invalidate(id);
+      qc.invalidateQueries({ queryKey: ['availability', id] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+    },
+  });
+};
+
 export const useReleaseReservation = () => {
   const qc = useQueryClient();
   const invalidate = useOrderInvalidator();

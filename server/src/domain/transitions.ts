@@ -26,7 +26,12 @@ export const TRANSITIONS: Record<OrderStatus, Transition[]> = {
   // Согласование: менеджер указывает условие оплаты и цены в спецификации.
   // Переход к отгрузке закрыт, пока нет двусторонней спецификации, а при
   // авансе — ещё и пока не получена оплата (проверки в orders.service).
-  SPEC_PREPARATION: [T('SHIPMENT', ['MANAGER', 'SALES_HEAD', 'WAREHOUSE'])],
+  // Отклонить можно и отсюда: клиент вправе не подписать спецификацию, и без
+  // этого перехода заявка зависла бы навсегда, удерживая товар в резерве.
+  SPEC_PREPARATION: [
+    T('SHIPMENT', ['MANAGER', 'SALES_HEAD', 'WAREHOUSE']),
+    T('REJECTED', ['MANAGER', 'SALES_HEAD']),
+  ],
   // Отгрузка: менеджер прикладывает документы, затем закрывает заявку.
   SHIPMENT: [T('CLOSED', ['MANAGER', 'SALES_HEAD'])],
   CLOSED: [],
